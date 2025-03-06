@@ -1,0 +1,8 @@
+*
+
+!*.py
+!*.md
+!.json
+
+test/__pycache__
+.vscode
