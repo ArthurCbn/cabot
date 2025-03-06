@@ -1,3 +1,7 @@
 .pytest_cache
-test/__pycache__
+*.pyc
+
 .vscode
+sandbox
+
+test.py
