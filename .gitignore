@@ -4,5 +4,7 @@
 !*.md
 !.json
 
+!requirements.txt
+
 test/__pycache__
 .vscode
