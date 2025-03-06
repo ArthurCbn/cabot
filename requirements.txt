@@ -1,1 +1,5 @@
 streamrip
+python-ffmpeg
+numpy
+pydub
+tinytag
