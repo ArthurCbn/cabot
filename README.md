@@ -1,5 +1,11 @@
 # Cabot
 
+## Dependencies
+
+```
+ffmpeg
+```
+
 ## Installation
 
 ```
