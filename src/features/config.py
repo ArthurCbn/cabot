@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import toml
 from streamrip.config import DEFAULT_CONFIG_PATH
+from typing import Any
 
 # region Utils
 def get_project_root() -> Path :
@@ -18,6 +19,7 @@ def get_project_root() -> Path :
 
 CABOT = get_project_root()
 CONFIG_PATH = CABOT / "config.json"
+DOWNLOADS_DB_PATH = CABOT / "downloads.db"
 CONFIG_CORRESPONDANCE = {
     ("qobuz", "email"): ("qobuz", "email_or_userid"),
     ("qobuz", "token"): ("qobuz", "password_or_token"),
@@ -28,7 +30,7 @@ CONFIG_CORRESPONDANCE = {
 
 
 # region Cabot
-def get_cabot_config_value(keys: list[str]) -> str :
+def get_cabot_config_value(keys: list[str]) -> Any :
 
     with open(CONFIG_PATH, 'r') as f :
         config_data = json.load(f)
@@ -93,10 +95,11 @@ def apply_cabot_config_to_streamrip() -> None :
 def initialize_config() -> None :
     apply_cabot_config_to_streamrip()
     set_streamrip_config_value("qobuz", "use_auth_token", "true")
+    set_streamrip_config_value("database", "downloads_path", str(DOWNLOADS_DB_PATH))
 
 def set_default_config() -> None :
     set_cabot_config_value(["tmp_folder"], str(CABOT / "tmp_download"))
+    set_cabot_config_value(["mp3_copy"], "True")
     initialize_config()
 
 # endregion
-
