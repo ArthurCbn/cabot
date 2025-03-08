@@ -3,3 +3,4 @@ python-ffmpeg
 numpy
 pydub
 tinytag
+toml
