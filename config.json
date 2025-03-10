@@ -3,5 +3,15 @@
         "email": "mx6puesafa@mituni.edu.pl",
         "token": "OaoZuprCP1P8n-4BZp-RBAkHyYwCveq9bHjB3eeCtAS9ZsAWiACKpcVGvMaoGdMrkKmKF3bF_6fbGthpB-JEqQ"
     },
-    "tmp_folder": "/home/acabon/dev/src/cabot/tmp_download"
+    
+    "tmp_folder": "/home/acabon/dev/src/cabot/tmp_download",
+
+    "playlists_folder": "/home/acabon/dev/src/cabot/playlists_folder",
+    "mp3_copy": "True",
+
+    "playlists": {
+        "TEST": {
+            "lastfm": "https://www.last.fm/fr/user/arthur_cbn/playlists/13234884"
+        }
+    }
 }
