@@ -3,12 +3,9 @@
         "email": "your_email",
         "token": "your_token"
     },
-    
     "tmp_folder": "/home/acabon/dev/src/cabot/tmp_download",
-
     "playlists_folder": "your/playlists/folder",
     "mp3_copy": "True",
-
     "playlists": {
         "your_playlist_name": {
             "lastfm": "your_playlist_url"
