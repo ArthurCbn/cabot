@@ -6,3 +6,5 @@ sandbox
 
 test.py
 *.db
+
+tmp_download

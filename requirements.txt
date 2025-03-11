@@ -1,4 +1,4 @@
-streamrip
+streamrip==2.0.5
 python-ffmpeg
 numpy
 pydub
