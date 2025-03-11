@@ -1,5 +1,7 @@
 # Cabot
 
+One command for one feature : updating all your playlists (download in lossless, convert, analyse key) .
+
 ## Dependencies
 
 ```
@@ -17,8 +19,5 @@ source ~/.bashrc
 
 ## Usage
 
-One command for one feature : updating all your playlists (download in lossless, convert, analyse key) 
-
-```
-cabot
-```
+1. Set-up your playlists by modifying config.json
+2. `cabot` : it's magic

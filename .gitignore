@@ -6,5 +6,6 @@ sandbox
 
 test.py
 *.db
+config.json
 
 tmp_download

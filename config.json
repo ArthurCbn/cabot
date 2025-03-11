@@ -1,17 +1,17 @@
 {
     "qobuz": {
-        "email": "mx6puesafa@mituni.edu.pl",
-        "token": "OaoZuprCP1P8n-4BZp-RBAkHyYwCveq9bHjB3eeCtAS9ZsAWiACKpcVGvMaoGdMrkKmKF3bF_6fbGthpB-JEqQ"
+        "email": "your_email",
+        "token": "your_token"
     },
     
     "tmp_folder": "/home/acabon/dev/src/cabot/tmp_download",
 
-    "playlists_folder": "/home/acabon/dev/src/cabot/playlists_folder",
+    "playlists_folder": "your/playlists/folder",
     "mp3_copy": "True",
 
     "playlists": {
-        "TEST": {
-            "lastfm": "https://www.last.fm/fr/user/arthur_cbn/playlists/13234884"
+        "your_playlist_name": {
+            "lastfm": "your_playlist_url"
         }
     }
 }
