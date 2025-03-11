@@ -10,6 +10,7 @@ ffmpeg
 
 ## Installation
 
+### Linux - using bash
 ```
 git clone https://ArthurCbn:**key**@github.com/ArthurCbn/cabot.git
 cd cabot
