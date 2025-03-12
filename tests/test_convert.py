@@ -14,7 +14,7 @@ from src.features.convert import (
 # region Utils
 
 # Paths
-DUMMY_FOLDER_PATH = CABOT / "test" / "dummy_audio"
+DUMMY_FOLDER_PATH = CABOT / "tests" / "dummy_audio"
 WHITE_NOISE_ABSOLUTE_PATH = DUMMY_FOLDER_PATH / "white_noise.wav"
 
 

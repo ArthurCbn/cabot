@@ -4,3 +4,4 @@ numpy
 pydub
 tinytag
 toml
+mutagen

@@ -8,6 +8,10 @@ pip install -r requirements.txt
 QOBUZ_PATH=$(python -c "import streamrip.client.qobuz as qb ; print(qb.__file__)")
 cp -f src/streamrip/qobuz.py $QOBUZ_PATH
 
+# Modif of tagger
+TAGGER_PATH=$(python -c "import streamrip.metadata.tagger as tagger ; print(tagger.__file__)")
+cp -f src/streamrip/tagger.py $TAGGER_PATH
+
 # Initialize config
 python -c "from src.features.config import set_default_config ; set_default_config()"
 
