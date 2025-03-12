@@ -1,14 +1,10 @@
 import os
-import asyncio
 from pathlib import Path
 from .config import (
     get_cabot_config_value,
     DOWNLOADS_DB_PATH,
 )
 from streamrip.db import Downloads
-from streamrip.client.qobuz import QobuzClient
-from streamrip.config import Config
-from tinytag import TinyTag
 from .convert import (
     convert_batch_to_aiff,
     convert_batch_to_mp3,
@@ -17,22 +13,18 @@ from .get import (
     get_lastfm_playlist,
     get_soundcloud_playlist,
 )
+from mutagen.aiff import AIFF
 
-async def scan_playlist(playlist_path: Path) -> None :
+
+def scan_playlist(playlist_path: Path) -> None :
     
-    async def _remember_song_id(song: Path, client: QobuzClient, database: Downloads) -> None :
+    def _remember_song_id(song: Path, database: Downloads) -> None :
         
         if song.suffix != ".aiff" :
             return
 
-        song_data = TinyTag.get(song)
-        song_key = f"{song_data.title} {song_data.artist}"
-        
-        res = await client.search("track", song_key, limit=1)
-        
-        # First pages > tracks > items > first item
-        song_id = res[0]["tracks"]["items"][0]["id"]
-        
+        song_data = AIFF(song)
+        song_id = str(song_data["TXXX:COMMENTS"])
         database.add((song_id,))
 
         return
@@ -45,21 +37,8 @@ async def scan_playlist(playlist_path: Path) -> None :
         os.remove(DOWNLOADS_DB_PATH)
     database = Downloads(DOWNLOADS_DB_PATH)
     
-    # Login
-    email = get_cabot_config_value(["qobuz", "email"])
-    token = get_cabot_config_value(["qobuz", "token"])
-
-    config = Config.defaults()
-    config.session.qobuz.use_auth_token = True
-    config.session.qobuz.email_or_userid = email
-    config.session.qobuz.password_or_token = token
-    client = QobuzClient(config)
-
-    await client.login()
-    
-    # Fetch all metadata in parallel
-    tasks = [_remember_song_id(song, client, database) for song in playlist_path.iterdir()]
-    await asyncio.gather(*tasks)
+    for song in playlist_path.iterdir() :
+        _remember_song_id(song, database)
 
     return
 
@@ -89,8 +68,7 @@ def update_playlists() -> None :
         # Scan already downloaded tracks
         print(f"Scanning {playlist}...", end="\r")
         
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(scan_playlist(playlist_path / "AIFF"))
+        scan_playlist(playlist_path / "AIFF")
         
         print(f"{playlist} scanned.")
         print(f"Initiating download...")
@@ -118,5 +96,3 @@ def update_playlists() -> None :
             os.rmdir(downloaded_playlist)
     
     return
-
-update_playlists()
