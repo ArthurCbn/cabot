@@ -1,10 +1,12 @@
 import os
+import asyncio
 from pathlib import Path
 from .config import (
     get_cabot_config_value,
     DOWNLOADS_DB_PATH,
 )
 from streamrip.db import Downloads
+from streamrip.media.playlist import PendingLastfmPlaylist
 from .convert import (
     convert_batch_to_aiff,
     convert_batch_to_mp3,
@@ -41,6 +43,16 @@ def scan_playlist(playlist_path: Path) -> None :
         _remember_song_id(song, database)
 
     return
+
+
+def remove_deleted_tracks(playlist_path: Path, lastfm_url: str) -> None :
+
+    # TODO SOUNDCLOUD
+
+    loop = asyncio.new_event_loop()
+    # Use default for all other attributes since useless for parsing only
+    lastfm_playlist = PendingLastfmPlaylist(lastfm_url, ..., ..., ..., ...)
+    _, playlist_content = loop.run_until_complete(lastfm_playlist._parse_lastfm_playlist(lastfm_url)) # list of (title, artist) 
 
 
 def update_playlists() -> None :
