@@ -23,6 +23,9 @@ def _convert_to_xxx(
     else :
         output_path = input_path.parent / f"{file_name}{format}"
 
+    if output_path.exists() :
+        os.remove(output_path)
+
     ffmpeg = FFmpeg().input(input_path).output(output_path, {"write_id3v2": 1})
     
     ffmpeg.execute()
