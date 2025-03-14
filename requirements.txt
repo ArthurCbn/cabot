@@ -5,3 +5,4 @@ pydub
 tinytag
 toml
 mutagen
+spotipy

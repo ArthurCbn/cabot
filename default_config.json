@@ -1,0 +1,19 @@
+{
+    "qobuz": {
+        "email": "",
+        "token": "",
+        "quality": 2
+    },
+    "spotify": {
+        "client_id": "",
+        "client_secret": ""
+    },
+    "tmp_folder": "",
+    "playlists_folder": "your/playlists/folder",
+    "mp3_copy": "True",
+    "playlists": {
+        "your_playlist": {
+            "spotify": "playlist_spotify_url"
+        }
+    }
+}

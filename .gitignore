@@ -2,10 +2,10 @@
 *.pyc
 
 .vscode
+
 sandbox
 
-test.py
+.cache
 *.db
 config.json
-
 tmp_download

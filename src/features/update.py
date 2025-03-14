@@ -1,6 +1,7 @@
 import os
 import asyncio
 from pathlib import Path
+import shutil
 from .config import (
     get_cabot_config_value,
     DOWNLOADS_DB_PATH,
@@ -13,6 +14,7 @@ from .convert import (
 )
 from .get import (
     get_lastfm_playlist,
+    get_spotify_playlist,
     get_soundcloud_playlist,
 )
 from mutagen.aiff import AIFF
@@ -95,28 +97,28 @@ def update_playlists() -> None :
         
         # Goes through every source given for the playlist (only implemented lastfm and SoundCloud)
         for source, url in sources.items() :
-
-            if source == "lastfm" :
+            
+            if source == "spotify" :
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(get_spotify_playlist(url))
+            elif source == "lastfm" :
                 get_lastfm_playlist(url)
             elif source == "soundcloud" :
                 get_soundcloud_playlist(url)
 
-            # No new downloads
-            if len(list(download_path.iterdir())) == 0 :
-                return
-            downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
- 
-            # Convert
-            print("Converting...", end="\r")
-            convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
-            if duplicate_to_mp3 :
-                convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
-            print("Converted.   ")
+            # New downloads
+            if download_path.exists() and len(list(download_path.iterdir())) > 0 :
+                
+                downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
+    
+                # Convert
+                print("Converting...", end="\r")
+                convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
+                if duplicate_to_mp3 :
+                    convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
+                print("Converted.   ")
 
-
-            for file in downloaded_playlist.iterdir() :
-                os.remove(file)
-            os.rmdir(downloaded_playlist)
+                shutil.rmtree(download_path)
     
         # Remove deleted tracks
         print(f"Deleting removed tracks...", end="\r")
