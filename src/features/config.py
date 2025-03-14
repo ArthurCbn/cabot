@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 import json
 import toml
@@ -18,6 +19,7 @@ def get_project_root() -> Path :
 
 
 CABOT = get_project_root()
+DEFAULT_CABOT_CONFIG_PATH = CABOT / "default_config.json"
 CONFIG_PATH = CABOT / "config.json"
 DOWNLOADS_DB_PATH = CABOT / "downloads.db"
 CONFIG_CORRESPONDANCE = {
@@ -98,6 +100,7 @@ def initialize_config() -> None :
     set_streamrip_config_value("database", "downloads_path", str(DOWNLOADS_DB_PATH))
 
 def set_default_config() -> None :
+    shutil.copy(DEFAULT_CABOT_CONFIG_PATH, CONFIG_PATH)
     set_cabot_config_value(["tmp_folder"], str(CABOT / "tmp_download"))
     set_cabot_config_value(["mp3_copy"], "True")
     initialize_config()
