@@ -45,15 +45,26 @@ def scan_playlist(playlist_path: Path) -> None :
     return
 
 
-def remove_deleted_tracks(playlist_path: Path, lastfm_url: str) -> None :
+def remove_deleted_tracks(playlist_path: Path) -> None :
+    
+    assert playlist_path.is_dir(), f"{playlist_path} n'est pas un dossier."
 
-    # TODO SOUNDCLOUD
+    aiff = playlist_path / "AIFF"
+    database = Downloads(DOWNLOADS_DB_PATH)
 
-    loop = asyncio.new_event_loop()
-    # Use default for all other attributes since useless for parsing only
-    lastfm_playlist = PendingLastfmPlaylist(lastfm_url, ..., ..., ..., ...)
-    _, playlist_content = loop.run_until_complete(lastfm_playlist._parse_lastfm_playlist(lastfm_url)) # list of (title, artist) 
+    for song in aiff.iterdir() :
 
+        song_data = AIFF(song)
+        song_id = str(song_data["TXXX:COMMENTS"])
+        if database.contains(id=song_id) :
+
+            os.remove(song)
+            mp3_track = playlist_path / "MP3" / f"{song.stem}.mp3"
+            if mp3_track.exists() :
+                os.remove(mp3_track)
+    
+    return
+    
 
 def update_playlists() -> None :
 
@@ -79,11 +90,8 @@ def update_playlists() -> None :
 
         # Scan already downloaded tracks
         print(f"Scanning {playlist}...", end="\r")
-        
         scan_playlist(playlist_path / "AIFF")
-        
-        print(f"{playlist} scanned.")
-        print(f"Initiating download...")
+        print(f"{playlist} scanned.   ")
         
         # Goes through every source given for the playlist (only implemented lastfm and SoundCloud)
         for source, url in sources.items() :
@@ -99,12 +107,21 @@ def update_playlists() -> None :
             downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
  
             # Convert
+            print("Converting...", end="\r")
             convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
             if duplicate_to_mp3 :
                 convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
-            
+            print("Converted.   ")
+
+
             for file in downloaded_playlist.iterdir() :
                 os.remove(file)
             os.rmdir(downloaded_playlist)
     
+        # Remove deleted tracks
+        print(f"Deleting removed tracks...", end="\r")
+        remove_deleted_tracks(playlist_path)
+        print(f"Removed tracks deleted.   ")
+
+
     return
