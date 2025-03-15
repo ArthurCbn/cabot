@@ -28,11 +28,9 @@ Set-up your playlists' urls directly in `config.json` like so :
     "mp3_copy": "True",
     "playlists": {
         "your_1st_playlist": {
-            "lastfm": "url_to_1st_lasftm_playlist",
             "spotify": "url_to_1st_spotify_playlist"
         },
         "your_2nd_playlist": {
-            "lastfm": "url_to_2ns_lasftm_playlist",
             "spotify": "url_to_2nd_spotify_playlist"
         }
     }
@@ -40,8 +38,6 @@ Set-up your playlists' urls directly in `config.json` like so :
 ```
 
 `mp3_copy` is useful if you want to have a copy of every downloaded tracks in mp3 320kbps.
-
->Unfortunately, last.fm does not support auto-sync : if the last.fm playlist is linked to another service, you'll need to update it manually on last.fm.
 
 
 ### Qobuz credentials
