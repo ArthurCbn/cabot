@@ -86,3 +86,8 @@ There you will find your Client ID and Client Secret, you can then copy-paste th
 ## Usage
 
 Just type `cabot` in your terminal.
+
+## Future features
+
+- Analyse key and automatically add it to the metadata
+- Rip from soundcloud
