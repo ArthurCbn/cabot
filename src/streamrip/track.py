@@ -54,6 +54,8 @@ class Track(Media):
         await tag_file(self.download_path, self.meta, self.cover_path)
         if self.config.session.conversion.enabled:
             await self._convert()
+        
+        # self.db.set_downloaded(self.meta.info.id) ## CABOT (removed)
 
     async def _convert(self):
         c = self.config.session.conversion

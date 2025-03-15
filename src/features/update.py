@@ -95,7 +95,7 @@ def update_playlists() -> None :
         scan_playlist(playlist_path / "AIFF")
         print(f"{playlist} scanned.   ")
         
-        # Goes through every source given for the playlist (only implemented lastfm and SoundCloud)
+        # Goes through every source given for the playlist
         for source, url in sources.items() :
             
             if source == "spotify" :

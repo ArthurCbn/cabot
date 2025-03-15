@@ -252,7 +252,7 @@ async def tag_file(path: str, meta: TrackMetadata, cover_path: str | None):
     tags = container.get_tag_pairs(meta)
     logger.debug("Tagging with %s", tags)
     container.tag_audio(audio, tags)
-    container.tag_audio(audio, [("COMMENTS", meta.info.id)])
+    container.tag_audio(audio, [("COMMENTS", meta.info.id)]) ## CABOT
     if cover_path is not None:
         await container.embed_cover(audio, cover_path)
     container.save_audio(audio, path)

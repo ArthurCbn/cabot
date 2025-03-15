@@ -21,6 +21,8 @@ from ..exceptions import (
 from .client import Client
 from .downloadable import BasicDownloadable, Downloadable
 
+# FIX FROM https://github.com/nathom/streamrip/pull/772 (for streamrip v2.0.5)
+
 logger = logging.getLogger("streamrip")
 
 QOBUZ_BASE_URL = "https://www.qobuz.com/api.json/0.2"
