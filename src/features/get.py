@@ -19,7 +19,9 @@ from .config import get_cabot_config_value, DOWNLOADS_DB_PATH
 
 def get_lastfm_playlist(playlist_url: str) -> None :
     
-    subprocess.run(["rip", "--quality", "2", "lastfm", playlist_url])
+    quality = get_cabot_config_value(["qobuz", "quality"])
+
+    subprocess.run(["rip", "--quality", quality, "lastfm", playlist_url])
 
     return
 
@@ -135,6 +137,7 @@ async def get_spotify_playlist(playlist_url: str) -> None :
                 ))
     
     qobuz_playlist = Playlist(playlist_title, config, client, pending_tracks)
+    
     
     # Rip the playlist
     await qobuz_playlist.rip()
