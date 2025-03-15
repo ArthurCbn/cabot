@@ -12,11 +12,17 @@ from .convert import (
     convert_batch_to_aiff,
     convert_batch_to_mp3,
 )
-from .get import (
-    get_spotify_playlist,
+from .rip import (
+    rip_spotify_playlist,
     get_soundcloud_playlist,
 )
+from .key import (
+    get_keys,
+    write_keys_in_flac,
+)
 from mutagen.aiff import AIFF
+from spotipy import Spotify
+from spotipy.oauth2 import SpotifyClientCredentials
 
 
 def scan_playlist(playlist_path: Path) -> None :
@@ -98,8 +104,27 @@ def update_playlists() -> None :
         for source, url in sources.items() :
             
             if source == "spotify" :
+
+                # Fetch spotify playlist
+                spotify_client_id = get_cabot_config_value(["spotify", "client_id"])
+                spotify_client_secret = get_cabot_config_value(["spotify", "client_secret"])
+                sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
+                    client_id=spotify_client_id, 
+                    client_secret=spotify_client_secret
+                ))
+                spotify_playlist = sp.playlist(url)
+
+                # Rip it
                 loop = asyncio.new_event_loop()
-                loop.run_until_complete(get_spotify_playlist(url))
+                id_to_uri_dict = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
+
+                # Analyse it
+                # TODO when I find a working API
+
+                # Write key in FLAC metadata
+                # write_keys_in_flac(download_path, key_by_id)
+
+            # TODO
             elif source == "soundcloud" :
                 get_soundcloud_playlist(url)
 
@@ -118,9 +143,9 @@ def update_playlists() -> None :
                 shutil.rmtree(download_path)
     
         # Remove deleted tracks
-        print(f"Deleting removed tracks...", end="\r")
+        print(f"Cleaning playlist folder...", end="\r")
         remove_deleted_tracks(playlist_path)
-        print(f"Removed tracks deleted.   ")
+        print(f"Playlist folder cleaned.   ")
 
 
     return

@@ -12,12 +12,10 @@ from streamrip.client import Client
 from streamrip.client.qobuz import QobuzClient
 from streamrip.config import Config
 from streamrip.db import Downloads, Database, Dummy
-from spotipy import Spotify
-from spotipy.oauth2 import SpotifyClientCredentials
 from .config import get_cabot_config_value, DOWNLOADS_DB_PATH
 
 
-async def get_spotify_playlist(playlist_url: str) -> None :
+async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
     
     @dataclass(slots=True)
     class Status:
@@ -39,9 +37,10 @@ async def get_spotify_playlist(playlist_url: str) -> None :
 
     async def _make_query(
             query: str,
+            uri: str,
             client: Client,
             search_status: Status,
-            callback) -> str | None:
+            callback) -> tuple[str, str] | None:
 
         with ExitStack() as stack:
 
@@ -54,7 +53,7 @@ async def get_spotify_playlist(playlist_url: str) -> None :
                     SearchResults.from_pages(client.source, "track", pages)
                     .results[0]
                     .id
-                )
+                ), uri
 
             search_status.failed += 1
             print(f"No result found for {query}")
@@ -64,21 +63,9 @@ async def get_spotify_playlist(playlist_url: str) -> None :
 
     # Fetch config values
     download_folder = Path(get_cabot_config_value(["tmp_folder"]))
-    spotify_client_id = get_cabot_config_value(["spotify", "client_id"])
-    spotify_client_secret = get_cabot_config_value(["spotify", "client_secret"])
     qobuz_email = get_cabot_config_value(["qobuz", "email"])
     qobuz_token = get_cabot_config_value(["qobuz", "token"])
     quality = get_cabot_config_value(["qobuz", "quality"])
-
-
-    # Fetch spotify playlist
-    sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
-        client_id=spotify_client_id, 
-        client_secret=spotify_client_secret
-    ))
-    spotify_playlist = sp.playlist(playlist_url)
-
-    playlist_title = spotify_playlist["name"]
 
 
     # Log in to qobuz client
@@ -101,10 +88,10 @@ async def get_spotify_playlist(playlist_url: str) -> None :
 
         requests = []
         for item in spotify_playlist["tracks"]["items"] :
-
             title = item["track"]["name"]
             artists = item["track"]["artists"]
-            requests.append(_make_query(f"{title} {', '.join(a['name'] for a in artists)}", client, s, callback))
+            uri = item["track"]["uri"]
+            requests.append(_make_query(f"{title} {', '.join(a['name'] for a in artists)}", uri, client, s, callback))
         
         results = await asyncio.gather(*requests)
 
@@ -114,8 +101,10 @@ async def get_spotify_playlist(playlist_url: str) -> None :
 
 
     # Build qobuz playlist
+    playlist_title = spotify_playlist["name"]
+    id_to_uri_dict = {}
     pending_tracks = []
-    for pos, id in enumerate(results, start=1) :
+    for pos, (id, uri) in enumerate(results, start=1) :
         pending_tracks.append(
                 PendingPlaylistTrack(
                     id,
@@ -126,6 +115,8 @@ async def get_spotify_playlist(playlist_url: str) -> None :
                     pos,
                     db,
                 ))
+        id_to_uri_dict[id] = uri
+        
     
     qobuz_playlist = Playlist(playlist_title, config, client, pending_tracks)
     
@@ -136,6 +127,8 @@ async def get_spotify_playlist(playlist_url: str) -> None :
 
     # Close the session
     await client.session.close()
+
+    return id_to_uri_dict
 
 
 # TODO
