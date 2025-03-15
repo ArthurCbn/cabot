@@ -13,7 +13,6 @@ from .convert import (
     convert_batch_to_mp3,
 )
 from .get import (
-    get_lastfm_playlist,
     get_spotify_playlist,
     get_soundcloud_playlist,
 )
@@ -101,8 +100,6 @@ def update_playlists() -> None :
             if source == "spotify" :
                 loop = asyncio.new_event_loop()
                 loop.run_until_complete(get_spotify_playlist(url))
-            elif source == "lastfm" :
-                get_lastfm_playlist(url)
             elif source == "soundcloud" :
                 get_soundcloud_playlist(url)
 
