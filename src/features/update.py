@@ -106,7 +106,7 @@ def update_one_playlist(
         if source == "spotify" :
 
             # Fetch spotify playlist
-            print("Fetching Spotify playlist...")
+            print("Fetching Spotify playlist...", end="\r")
             spotify_client_id = get_cabot_config_value(["spotify", "client_id"])
             spotify_client_secret = get_cabot_config_value(["spotify", "client_secret"])
             sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
