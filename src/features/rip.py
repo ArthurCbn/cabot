@@ -25,7 +25,7 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
 
         def text(self) -> Text:
             return Text.assemble(
-                "Searching for last.fm tracks (",
+                "Searching for Spotify tracks (",
                 (f"{self.found} found", "bold green"),
                 ", ",
                 (f"{self.failed} failed", "bold red"),
