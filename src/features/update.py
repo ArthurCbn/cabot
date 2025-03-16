@@ -120,7 +120,7 @@ def update_one_playlist(
 
             # Rip playlist
             loop = asyncio.get_event_loop()
-            id_to_uri_dict = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
+            failed_tracks = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
 
             # Analyse it
             # TODO when I find a working API
@@ -136,6 +136,14 @@ def update_one_playlist(
         # Stop progress bar
         _p.live.stop()
         _p.started = False
+
+
+        # Failed tracks
+        if failed_tracks :
+            print("The following tracks do not exist on Qobuz : ")
+            for t in failed_tracks :
+                print(f"   -> {t.replace("\n", "")}")
+            print("")
 
 
         # New downloads
@@ -157,6 +165,7 @@ def update_one_playlist(
     print(f"Cleaning playlist folder...", end="\r")
     remove_deleted_tracks(playlist_path)
     print(f"Playlist folder cleaned.   ")
+    print("")
 
     return 
 
