@@ -114,7 +114,7 @@ def update_one_playlist(
                 client_secret=spotify_client_secret
             ))
             spotify_playlist = sp.playlist(url)
-            print("Spotify playlist fetched.  ")
+            print("Spotify playlist fetched.   ")
 
 
             # Rip playlist
