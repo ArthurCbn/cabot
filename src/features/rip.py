@@ -56,7 +56,7 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
                 ), uri
 
             search_status.failed += 1
-            print(f"No result found for {query}")
+            raise AssertionError(f"No result found for {query}")
 
             return None
 
