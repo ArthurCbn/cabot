@@ -1,7 +1,9 @@
 import subprocess
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from rich.text import Text
 from pathlib import Path
+import re
 import os
 import asyncio
 from contextlib import ExitStack
@@ -12,10 +14,14 @@ from streamrip.client import Client
 from streamrip.client.qobuz import QobuzClient
 from streamrip.config import Config
 from streamrip.db import Downloads, Database, Dummy
-from .config import get_cabot_config_value, DOWNLOADS_DB_PATH
+from .config import (
+    get_cabot_config_value, 
+    DOWNLOADS_DB_PATH,
+    TRACKS_NOT_FOUND_PATH,
+)
 
 
-async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
+async def rip_spotify_playlist(spotify_playlist: dict) -> list[str] :
     
     @dataclass(slots=True)
     class Status:
@@ -36,28 +42,150 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
 
 
     async def _make_query(
-            query: str,
-            uri: str,
+            name: str,
+            album: str,
+            artists: list[str],
+            isrc: str,
             client: Client,
             search_status: Status,
-            callback) -> tuple[str, str] | None:
+            callback) -> str | None:
+
+        async def __get_track_from_album(
+                album_id: str,
+                name: str=name,
+                client: Client=client) -> str | None :
+
+            status, tracklist_request = await client._api_request("album/get", {"album_id": album_id})
+            assert status == 200
+
+            tracks = tracklist_request["tracks"]["items"]
+            track_id_by_name = {track["title"]: track["id"] for track in tracks}
+
+            if name in track_id_by_name :
+                return track_id_by_name[name]
+
+            # Remove the (feat. ...)
+            track_id_by_name = {re.sub(r"\(feat.[a-zA-Z0-9 ]*\)", "", name): id for name, id in track_id_by_name.items()}
+            if name in track_id_by_name :
+                return track_id_by_name[name]
+
+            return None
+
+
+        async def __query_by_artist_album_track(
+                name: str=name,
+                album: str=album,
+                artist: str=artists[0],
+                client: Client=client) -> str | None :
+            
+            #
+            # Query artist
+            #
+            status, artist_request = await client._api_request("artist/search", {"query": artist, "limit": 1})
+            assert status == 200
+
+            results = artist_request["artists"]["items"]
+            if len(results) == 0 :
+                return None
+            
+            artist_id = results[0]["id"]
+
+            #
+            # Fetch artist discography
+            #
+            status, albums_request = await client._api_request("artist/page", {"artist_id": artist_id})
+            assert status == 200
+
+            albums = []
+            releases_by_types = albums_request["releases"]
+            for releases in releases_by_types :
+                if releases["type"] == "album" :
+                    albums = releases["items"]
+                    break
+            
+            if len(albums) == 0 :
+                return None
+            
+            #
+            # Select album
+            #
+            album_id = None
+            album_id_by_name = {album["title"]: album["id"] for album in albums}
+
+            # Full album name match
+            if album in album_id_by_name :
+                album_id = album_id_by_name[album]
+            else :
+
+                # Album name + (Extended) for instance
+                for potential_album, album_id in album_id_by_name.items() :
+                    if album in potential_album :
+                        break
+                else :
+
+                    # Album name without potential extensions
+                    for potential_album, album_id in album_id_by_name.items() :
+                        if potential_album in album :
+                            break
+            
+            if album_id is None :
+                return None
+    
+
+            #
+            # Select track
+            #
+            return await __get_track_from_album(album_id)
+
 
         with ExitStack() as stack:
 
             stack.callback(callback)
 
-            pages = await client.search("track", query, limit=1)
+            # Search by ISRC first
+            pages = await client.search("track", isrc, limit=1)
             if len(pages) > 0:
+                
+                results = pages[0]["tracks"]["items"]
+                if len(results) > 0 :
+
+                    if results[0]["isrc"] == isrc :
+                        search_status.found += 1
+                        return results[0]["id"]
+            
+            # If not conclusive, tries by title - artists
+            pages = await client.search("track", f"{name} {' '.join(artists)}", limit=1)
+            if len(pages) > 0 :
+                results = pages[0]["tracks"]["items"]
+                if len(results) > 0 :
+
+                    if (results[0]["title"] == name) and any(a in results[0]["performers"] for a in artists) :
+                        search_status.found += 1
+                        return results[0]["id"]
+            
+            # Else, trie by album - artist
+            pages = await client.search("album", f"{album} {' '.join(artists)}", limit=1)
+            if len(pages) > 0 :
+                results = pages[0]["albums"]["items"]
+                if len(results) > 0 :
+
+                    if results[0]["title"] == name :
+                        track_id = await __get_track_from_album(results[0]["id"])
+                        if not track_id is None :
+                            search_status.found += 1
+                            return track_id
+
+            # Lastly, trie by artist > album > track
+            track_id = await __query_by_artist_album_track()
+            if not track_id is None :
                 search_status.found += 1
-                return (
-                    SearchResults.from_pages(client.source, "track", pages)
-                    .results[0]
-                    .id
-                ), uri
+                return track_id
 
+            # Fail
             search_status.failed += 1
-            raise AssertionError(f"No result found for {query}")
-
+            with open(TRACKS_NOT_FOUND_PATH, "+a") as f:
+                f.write(f"'{name}' - {', '.join(artists)}\n")
+                
             return None
 
 
@@ -66,6 +194,8 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
     qobuz_email = get_cabot_config_value(["qobuz", "email"])
     qobuz_token = get_cabot_config_value(["qobuz", "token"])
     quality = get_cabot_config_value(["qobuz", "quality"])
+
+    playlist_title = spotify_playlist["name"]
 
 
     # Log in to qobuz client
@@ -80,6 +210,9 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
 
 
     # Fetch qobuz ids
+    with open(TRACKS_NOT_FOUND_PATH, "w") as f:
+        f.write("")
+
     s = Status(0, 0, len(spotify_playlist["tracks"]["items"]))
     with console.status(s.text(), spinner="moon") as status:
         
@@ -89,10 +222,13 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
         requests = []
         for item in spotify_playlist["tracks"]["items"] :
             title = item["track"]["name"]
-            artists = item["track"]["artists"]
-            uri = item["track"]["uri"]
-            requests.append(_make_query(f"{title} {', '.join(a['name'] for a in artists)}", uri, client, s, callback))
-        
+            album = item["track"]["album"]["name"]
+            artists = [a["name"] for a in item["track"]["artists"]]
+            isrc = item["track"]["external_ids"]["isrc"]
+
+            # Query by isrc
+            requests.append(_make_query(title, album, artists, isrc, client, s, callback))
+
         results = await asyncio.gather(*requests)
 
 
@@ -101,23 +237,20 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
 
 
     # Build qobuz playlist
-    playlist_title = spotify_playlist["name"]
-    id_to_uri_dict = {}
     pending_tracks = []
-    for pos, (id, uri) in enumerate(results, start=1) :
-        pending_tracks.append(
-                PendingPlaylistTrack(
-                    id,
-                    client,
-                    config,
-                    download_folder / playlist_title,
-                    playlist_title,
-                    pos,
-                    db,
-                ))
-        id_to_uri_dict[id] = uri
+    for pos, id in enumerate(results, start=1) :
+        if not id is None :
+            pending_tracks.append(
+                    PendingPlaylistTrack(
+                        id,
+                        client,
+                        config,
+                        download_folder / playlist_title,
+                        playlist_title,
+                        pos,
+                        db,
+                    ))
         
-    
     qobuz_playlist = Playlist(playlist_title, config, client, pending_tracks)
     
 
@@ -128,7 +261,14 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> dict[str, str] :
     # Close the session
     await client.session.close()
 
-    return id_to_uri_dict
+    
+    # Fetch failed tracks
+    with open(TRACKS_NOT_FOUND_PATH, "r") as f:
+        failed_tracks = f.readlines()
+    
+
+    return failed_tracks
+
 
 
 # TODO
