@@ -4,6 +4,9 @@
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
+# Initialize streamrip config file
+rip config path 
+
 # Fixing streamrip qobuz
 QOBUZ_PATH=$(python -c "import streamrip.client.qobuz as qb ; print(qb.__file__)")
 cp -f src/streamrip/qobuz.py $QOBUZ_PATH
