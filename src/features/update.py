@@ -85,6 +85,7 @@ def update_one_playlist(
         duplicate_to_mp3: bool) -> None :
 
     # Init playlist folders
+    playlist = playlist.replace("/", " ")
     playlist_path = playlists_folder / playlist
     if not playlist_path.exists() :
         os.mkdir(playlist_path)
