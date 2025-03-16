@@ -7,7 +7,12 @@ from .config import (
     DOWNLOADS_DB_PATH,
 )
 from streamrip.db import Downloads
-from streamrip.progress import clear_progress
+from streamrip.progress import (
+    _p,
+    ProgressManager,
+    clear_progress,
+    add_title,
+)
 from .convert import (
     convert_batch_to_aiff,
     convert_batch_to_mp3,
@@ -98,6 +103,9 @@ def update_one_playlist(
     # Goes through every source given for the playlist
     for source, url in sources.items() :
         
+        global _p
+        _p = ProgressManager()
+
         if source == "spotify" :
 
             # Fetch spotify playlist
