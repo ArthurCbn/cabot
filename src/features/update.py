@@ -102,13 +102,11 @@ def update_one_playlist(
 
     # Goes through every source given for the playlist
     for source, url in sources.items() :
-        
-        global _p
-        _p = ProgressManager()
 
         if source == "spotify" :
 
             # Fetch spotify playlist
+            print("Fetching Spotify playlist...")
             spotify_client_id = get_cabot_config_value(["spotify", "client_id"])
             spotify_client_secret = get_cabot_config_value(["spotify", "client_secret"])
             sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
@@ -116,9 +114,10 @@ def update_one_playlist(
                 client_secret=spotify_client_secret
             ))
             spotify_playlist = sp.playlist(url)
+            print("Spotify playlist fetched.  ")
 
-            # Rip it
-            
+
+            # Rip playlist
             loop = asyncio.get_event_loop()
             id_to_uri_dict = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
 
@@ -133,8 +132,9 @@ def update_one_playlist(
             get_soundcloud_playlist(url)
 
 
-        # Clear progress bar
-        clear_progress()
+        # Stop progress bar
+        _p.live.stop()
+        _p.started = False
 
 
         # New downloads
