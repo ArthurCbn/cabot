@@ -17,7 +17,6 @@ from .rip import (
     get_soundcloud_playlist,
 )
 from .key import (
-    get_keys,
     write_keys_in_flac,
 )
 from mutagen.aiff import AIFF
@@ -71,9 +70,84 @@ def remove_deleted_tracks(playlist_path: Path) -> None :
                 os.remove(mp3_track)
     
     return
-    
 
-def update_playlists() -> None :
+
+def update_one_playlist(
+        playlist: str, 
+        sources: dict[str, str],
+        download_path: Path,
+        playlists_folder: Path,
+        duplicate_to_mp3: bool) -> None :
+
+    # Init playlist folders
+    playlist_path = playlists_folder / playlist
+    if not playlist_path.exists() :
+        os.mkdir(playlist_path)
+        os.mkdir(playlist_path / "AIFF")
+
+        if duplicate_to_mp3 :
+            os.mkdir(playlist_path / "MP3")
+
+
+    # Scan already downloaded tracks
+    print(f"Scanning {playlist}...", end="\r")
+    scan_playlist(playlist_path / "AIFF")
+    print(f"{playlist} scanned.   ")
+
+
+    # Goes through every source given for the playlist
+    for source, url in sources.items() :
+        
+        if source == "spotify" :
+
+            # Fetch spotify playlist
+            spotify_client_id = get_cabot_config_value(["spotify", "client_id"])
+            spotify_client_secret = get_cabot_config_value(["spotify", "client_secret"])
+            sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
+                client_id=spotify_client_id, 
+                client_secret=spotify_client_secret
+            ))
+            spotify_playlist = sp.playlist(url)
+
+            # Rip it
+            loop = asyncio.new_event_loop()
+            id_to_uri_dict = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
+
+            # Analyse it
+            # TODO when I find a working API
+
+            # Write key in FLAC metadata
+            # write_keys_in_flac(download_path, key_by_id)
+
+        # TODO
+        elif source == "soundcloud" :
+            get_soundcloud_playlist(url)
+
+
+        # New downloads
+        if download_path.exists() and len(list(download_path.iterdir())) > 0 :
+            
+            downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
+
+            # Convert
+            print("Converting...", end="\r")
+            convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
+            if duplicate_to_mp3 :
+                convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
+            print("Converted.   ")
+
+            shutil.rmtree(download_path)
+
+
+    # Remove deleted tracks
+    print(f"Cleaning playlist folder...", end="\r")
+    remove_deleted_tracks(playlist_path)
+    print(f"Playlist folder cleaned.   ")
+
+    return 
+
+
+def update_playlists(playlists_to_update: list[str]|None=None) -> None :
 
     duplicate_to_mp3 = bool(get_cabot_config_value(["mp3_copy"]))
     download_path = Path(get_cabot_config_value(["tmp_folder"]))
@@ -84,68 +158,18 @@ def update_playlists() -> None :
     if not playlists_folder.exists() :
         os.mkdir(playlists_folder)
 
-    for playlist, sources in playlists.items() :
-        
-        # Init playlist folders
-        playlist_path = playlists_folder / playlist
-        if not playlist_path.exists() :
-            os.mkdir(playlist_path)
-            os.mkdir(playlist_path / "AIFF")
+    playlists_to_update = playlists_to_update or list(playlists.keys())
 
-            if duplicate_to_mp3 :
-                os.mkdir(playlist_path / "MP3")
+    for playlist in playlists_to_update :
 
-        # Scan already downloaded tracks
-        print(f"Scanning {playlist}...", end="\r")
-        scan_playlist(playlist_path / "AIFF")
-        print(f"{playlist} scanned.   ")
-        
-        # Goes through every source given for the playlist
-        for source, url in sources.items() :
-            
-            if source == "spotify" :
+        assert playlist in playlists, f"{playlist} is not configured, please fill `config.json` correctly."
 
-                # Fetch spotify playlist
-                spotify_client_id = get_cabot_config_value(["spotify", "client_id"])
-                spotify_client_secret = get_cabot_config_value(["spotify", "client_secret"])
-                sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
-                    client_id=spotify_client_id, 
-                    client_secret=spotify_client_secret
-                ))
-                spotify_playlist = sp.playlist(url)
+        sources = playlists[playlist]
 
-                # Rip it
-                loop = asyncio.new_event_loop()
-                id_to_uri_dict = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
-
-                # Analyse it
-                # TODO when I find a working API
-
-                # Write key in FLAC metadata
-                # write_keys_in_flac(download_path, key_by_id)
-
-            # TODO
-            elif source == "soundcloud" :
-                get_soundcloud_playlist(url)
-
-            # New downloads
-            if download_path.exists() and len(list(download_path.iterdir())) > 0 :
-                
-                downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
-    
-                # Convert
-                print("Converting...", end="\r")
-                convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
-                if duplicate_to_mp3 :
-                    convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
-                print("Converted.   ")
-
-                shutil.rmtree(download_path)
-    
-        # Remove deleted tracks
-        print(f"Cleaning playlist folder...", end="\r")
-        remove_deleted_tracks(playlist_path)
-        print(f"Playlist folder cleaned.   ")
-
+        update_one_playlist(playlist,
+                            sources,
+                            download_path,
+                            playlists_folder,
+                            duplicate_to_mp3)
 
     return
