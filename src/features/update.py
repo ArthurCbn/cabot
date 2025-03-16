@@ -7,7 +7,7 @@ from .config import (
     DOWNLOADS_DB_PATH,
 )
 from streamrip.db import Downloads
-from streamrip.media.playlist import PendingLastfmPlaylist
+from streamrip.progress import clear_progress
 from .convert import (
     convert_batch_to_aiff,
     convert_batch_to_mp3,
@@ -110,7 +110,8 @@ def update_one_playlist(
             spotify_playlist = sp.playlist(url)
 
             # Rip it
-            loop = asyncio.new_event_loop()
+            
+            loop = asyncio.get_event_loop()
             id_to_uri_dict = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
 
             # Analyse it
@@ -122,6 +123,10 @@ def update_one_playlist(
         # TODO
         elif source == "soundcloud" :
             get_soundcloud_playlist(url)
+
+
+        # Clear progress bar
+        clear_progress()
 
 
         # New downloads
