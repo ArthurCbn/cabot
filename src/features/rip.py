@@ -163,7 +163,7 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> list[str] :
                         search_status.found += 1
                         return results[0]["id"]
             
-            # Else, trie by album - artist
+            # Else, tries by album - artist
             pages = await client.search("album", f"{album} {' '.join(artists)}", limit=1)
             if len(pages) > 0 :
                 results = pages[0]["albums"]["items"]
@@ -245,12 +245,12 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> list[str] :
                         id,
                         client,
                         config,
-                        download_folder / playlist_title,
+                        download_folder / playlist_title.replace("/", " "),
                         playlist_title,
                         pos,
                         db,
                     ))
-        
+
     qobuz_playlist = Playlist(playlist_title, config, client, pending_tracks)
     
 

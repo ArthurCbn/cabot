@@ -19,9 +19,13 @@ cp -f src/streamrip/tagger.py $TAGGER_PATH
 PLAYLIST_PATH=$(python -c "import streamrip.media.playlist as playlist ; print(playlist.__file__)")
 cp -f src/streamrip/playlist.py $PLAYLIST_PATH
 
-# Modif of tagger
+# Modif of track
 TRACK_PATH=$(python -c "import streamrip.media.track as track ; print(track.__file__)")
 cp -f src/streamrip/track.py $TRACK_PATH
+
+# Modif of metadata track
+META_TRACK_PATH=$(python -c "import streamrip.metadata.track as track ; print(track.__file__)")
+cp -f src/streamrip/metadata_track.py $META_TRACK_PATH
 
 # Initialize config
 python -c "from src.features.config import set_default_config ; set_default_config()"
