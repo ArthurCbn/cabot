@@ -25,7 +25,6 @@ python -c "from src.features.config import set_default_config ; set_default_conf
 
 # Add the alias to .bashrc (for bash shell users)
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-CABOT_COMMAND="CWD=\$(pwd) ; cd $SCRIPT_DIR && python -m src.main && cd \$CWD"
 
 sed -i '/cabot/d' ~/.bashrc
-echo "alias cabot='$CABOT_COMMAND'" >> ~/.bashrc
+echo "alias cabot='bash $SCRIPT_DIR/cabot.sh'" >> ~/.bashrc

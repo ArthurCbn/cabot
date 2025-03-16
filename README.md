@@ -85,7 +85,8 @@ There you will find your Client ID and Client Secret, you can then copy-paste th
 
 ## Usage
 
-Just type `cabot` in your terminal.
+Just type `cabot` in your terminal to update all configurated playlists.
+You can also specify certain playlists as arguments : `cabot playlist1 "another playlist with multiple words"`.
 
 ## Future features
 
