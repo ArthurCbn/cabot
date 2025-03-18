@@ -27,6 +27,7 @@ from .key import (
 from mutagen.aiff import AIFF
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyClientCredentials
+from mutagen._iff import EmptyChunk
 
 
 def scan_playlist(playlist_path: Path) -> None :
@@ -35,8 +36,12 @@ def scan_playlist(playlist_path: Path) -> None :
         
         if song.suffix != ".aiff" :
             return
-
-        song_data = AIFF(song)
+        
+        try :
+            song_data = AIFF(song)
+        except EmptyChunk:
+            os.remove(song)
+        
         song_id = str(song_data["TXXX:COMMENTS"])
         database.add((song_id,))
 
