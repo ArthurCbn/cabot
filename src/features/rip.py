@@ -17,12 +17,42 @@ from .config import (
     get_cabot_config_value,
     TRACKS_NOT_FOUND_PATH,
 )
+from spotipy import Spotify
+from spotipy.oauth2 import SpotifyClientCredentials
+
+
+_CACHE_SPOTIFY_PLAYLIST = {}
+def fetch_spotify_playlist(url: str) -> dict :
+
+    if url in _CACHE_SPOTIFY_PLAYLIST :
+        return _CACHE_SPOTIFY_PLAYLIST[url]
+
+    # Login
+    spotify_client_id = get_cabot_config_value(["spotify", "client_id"])
+    spotify_client_secret = get_cabot_config_value(["spotify", "client_secret"])
+    sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
+        client_id=spotify_client_id, 
+        client_secret=spotify_client_secret
+    ))
+
+    # Fetch
+    spotify_playlist = sp.playlist(url)
+
+    # Memoize
+    _CACHE_SPOTIFY_PLAYLIST[url] = spotify_playlist
+
+
+    return spotify_playlist
 
 
 async def rip_spotify_playlist(
         spotify_playlist: dict,
-        memory: set[str]) -> tuple[list[str],
-                                   set[str]] :
+        memory: set[str],
+        offset: int,
+        limit: int=25) -> tuple[list[str],
+                                set[str],
+                                int,
+                                bool] :
     
     @dataclass(slots=True)
     class Status:
@@ -47,9 +77,10 @@ async def rip_spotify_playlist(
             album: str,
             artists: list[str],
             isrc: str,
+            track_idx: int,
             client: Client,
             search_status: Status,
-            callback) -> str | None:
+            callback) -> tuple[int, str] | None:
 
         async def __get_track_from_album(
                 album_id: str,
@@ -152,7 +183,7 @@ async def rip_spotify_playlist(
 
                     if results[0]["isrc"] == isrc :
                         search_status.found += 1
-                        return results[0]["id"]
+                        return track_idx, results[0]["id"]
             
             # If not conclusive, tries by title - artists
             pages = await client.search("track", f"{name} {' '.join(artists)}", limit=1)
@@ -162,7 +193,7 @@ async def rip_spotify_playlist(
 
                     if (results[0]["title"] == name) and any(a in results[0]["performers"] for a in artists) :
                         search_status.found += 1
-                        return results[0]["id"]
+                        return track_idx, results[0]["id"]
             
             # Else, tries by album - artist
             pages = await client.search("album", f"{album} {' '.join(artists)}", limit=1)
@@ -174,13 +205,13 @@ async def rip_spotify_playlist(
                         track_id = await __get_track_from_album(results[0]["id"])
                         if not track_id is None :
                             search_status.found += 1
-                            return track_id
+                            return track_idx, track_id
 
             # Lastly, trie by artist > album > track
             track_id = await __query_by_artist_album_track()
             if not track_id is None :
                 search_status.found += 1
-                return track_id
+                return track_idx, track_id
 
             # Fail
             search_status.failed += 1
@@ -197,6 +228,7 @@ async def rip_spotify_playlist(
     quality = get_cabot_config_value(["qobuz", "quality"])
 
     playlist_title = spotify_playlist["name"]
+    playlist_length = len(spotify_playlist["tracks"]["items"])
 
     # Log in to qobuz client
     config = Config.defaults()
@@ -213,7 +245,7 @@ async def rip_spotify_playlist(
     with open(TRACKS_NOT_FOUND_PATH, "w") as f:
         f.write("")
 
-    s = Status(0, 0, len(spotify_playlist["tracks"]["items"]))
+    s = Status(0, 0, playlist_length)
     with console.status(s.text(), spinner="moon") as status:
         
         def callback():
@@ -221,7 +253,15 @@ async def rip_spotify_playlist(
 
         requests = []
         memory_match = set()
-        for item in spotify_playlist["tracks"]["items"] :
+
+
+        # Request by batch to prevent overloading API
+        next_track = offset
+        requested_tracks = 0
+        while (requested_tracks < limit) and (next_track < playlist_length) :
+            
+            item = spotify_playlist["tracks"]["items"][next_track]
+            
             title = item["track"]["name"]
             album = item["track"]["album"]["name"]
             artists = [a["name"] for a in item["track"]["artists"]]
@@ -230,13 +270,16 @@ async def rip_spotify_playlist(
             if not isrc in memory :
 
                 # Query track in Qobuz
-                requests.append(_make_query(title, album, artists, isrc, client, s, callback))
+                requests.append(_make_query(title, album, artists, isrc, next_track, client, s, callback))
+                requested_tracks += 1
             
             else :
 
                 # Memorized track in the Spotify playlist
                 memory_match |= {isrc}
                 s.found += 1
+            
+            next_track += 1
 
 
         results = await asyncio.gather(*requests)
@@ -248,8 +291,9 @@ async def rip_spotify_playlist(
 
     # Build qobuz playlist
     pending_tracks = []
-    for pos, id in enumerate(results, start=1) :
-        if not id is None :
+    for res in results :
+        if not res is None :
+            pos, id = res
             pending_tracks.append(
                     PendingPlaylistTrack(
                         id,
@@ -257,7 +301,7 @@ async def rip_spotify_playlist(
                         config,
                         download_folder / playlist_title.replace("/", " "),
                         playlist_title,
-                        pos,
+                        pos+1,
                         db,
                     ))
 
@@ -278,7 +322,7 @@ async def rip_spotify_playlist(
         os.remove(TRACKS_NOT_FOUND_PATH)
     
 
-    return failed_tracks, memory_match
+    return failed_tracks, memory_match, next_track, (next_track == playlist_length)
 
 
 
