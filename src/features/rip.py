@@ -14,9 +14,9 @@ from streamrip.client import Client
 from streamrip.client.qobuz import QobuzClient
 from streamrip.config import Config
 from streamrip.db import Downloads, Database, Dummy
+from streamrip.config import DEFAULT_DOWNLOADS_DB_PATH
 from .config import (
-    get_cabot_config_value, 
-    DOWNLOADS_DB_PATH,
+    get_cabot_config_value,
     TRACKS_NOT_FOUND_PATH,
 )
 
@@ -245,7 +245,7 @@ async def rip_spotify_playlist(
 
 
     # Database
-    db = Database(Downloads(DOWNLOADS_DB_PATH), Dummy())
+    db = Database(Downloads(DEFAULT_DOWNLOADS_DB_PATH), Dummy())
 
 
     # Build qobuz playlist
