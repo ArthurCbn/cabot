@@ -41,6 +41,7 @@ def scan_playlist(playlist_path: Path) -> None :
             song_data = AIFF(song)
         except EmptyChunk:
             os.remove(song)
+            return
         
         song_id = str(song_data["TXXX:COMMENTS"])
         database.add((song_id,))
