@@ -25,8 +25,8 @@ def _convert_to_xxx(
 
     if output_path.exists() :
         os.remove(output_path)
-
-    ffmpeg = FFmpeg().input(input_path).output(output_path, {"write_id3v2": 1, "stats": None})
+    # TODO Sanitize metadata ?
+    ffmpeg = FFmpeg().input(input_path).output(output_path, {"write_id3v2": 1})
     
     ffmpeg.execute()
     
