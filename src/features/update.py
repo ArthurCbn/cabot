@@ -30,50 +30,47 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from mutagen._iff import EmptyChunk
 
 
-def scan_playlist(playlist_path: Path) -> None :
+def scan_playlist(playlist_path: Path) -> set[str] :
     
-    def _remember_song_id(song: Path, database: Downloads) -> None :
-        
+    def _remember_song_id(song: Path, memory: set[str]) -> set[str] :
+
         if song.suffix != ".aiff" :
-            return
+            return memory
         
         try :
             song_data = AIFF(song)
         except EmptyChunk:
             os.remove(song)
-            return
+            return memory
         
         song_id = str(song_data["TXXX:COMMENTS"])
-        database.add((song_id,))
+        memory |= {song_id}
 
-        return
+        return memory
     
 
     assert playlist_path.is_dir(), f"{playlist_path} n'est pas un dossier existant."
 
-    # Reset the DB
-    if DOWNLOADS_DB_PATH.exists() :
-        os.remove(DOWNLOADS_DB_PATH)
-    database = Downloads(DOWNLOADS_DB_PATH)
-    
+    memory = set()
     for song in playlist_path.iterdir() :
-        _remember_song_id(song, database)
+        memory = _remember_song_id(song, memory)
 
-    return
+    return memory
 
 
-def remove_deleted_tracks(playlist_path: Path) -> None :
+def remove_deleted_tracks(
+        playlist_path: Path, 
+        unmatched_tracks: set[str]) -> None :
     
     assert playlist_path.is_dir(), f"{playlist_path} n'est pas un dossier."
 
     aiff = playlist_path / "AIFF"
-    database = Downloads(DOWNLOADS_DB_PATH)
 
     for song in aiff.iterdir() :
 
         song_data = AIFF(song)
         song_id = str(song_data["TXXX:COMMENTS"])
-        if database.contains(id=song_id) :
+        if song_id in unmatched_tracks :
 
             os.remove(song)
             mp3_track = playlist_path / "MP3" / f"{song.stem}.mp3"
@@ -103,9 +100,14 @@ def update_one_playlist(
 
     # Scan already downloaded tracks
     print(f"Scanning {playlist}...", end="\r")
-    scan_playlist(playlist_path / "AIFF")
+    memory = scan_playlist(playlist_path / "AIFF")
     print(f"{playlist} scanned.   ")
 
+    # Clear Downloads database
+    if DOWNLOADS_DB_PATH.exists() :
+        os.remove(DOWNLOADS_DB_PATH)
+
+    checked_memory = set()
 
     # Goes through every source given for the playlist
     for source, url in sources.items() :
@@ -126,7 +128,9 @@ def update_one_playlist(
 
             # Rip playlist
             loop = asyncio.get_event_loop()
-            failed_tracks = loop.run_until_complete(rip_spotify_playlist(spotify_playlist))
+            failed_tracks, memory_match = loop.run_until_complete(rip_spotify_playlist(spotify_playlist, memory))
+
+            checked_memory |= memory_match
 
             # Analyse it
             # TODO when I find a working API
@@ -169,7 +173,7 @@ def update_one_playlist(
 
     # Remove deleted tracks
     print(f"Cleaning playlist folder...", end="\r")
-    remove_deleted_tracks(playlist_path)
+    remove_deleted_tracks(playlist_path, memory - memory_match)
     print(f"Playlist folder cleaned.   ")
     print("")
 

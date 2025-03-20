@@ -21,7 +21,10 @@ from .config import (
 )
 
 
-async def rip_spotify_playlist(spotify_playlist: dict) -> list[str] :
+async def rip_spotify_playlist(
+        spotify_playlist: dict,
+        memory: set[str]) -> tuple[list[str],
+                                   set[str]] :
     
     @dataclass(slots=True)
     class Status:
@@ -197,7 +200,6 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> list[str] :
 
     playlist_title = spotify_playlist["name"]
 
-
     # Log in to qobuz client
     config = Config.defaults()
     config.session.qobuz.email_or_userid = qobuz_email
@@ -220,14 +222,24 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> list[str] :
             status.update(s.text())
 
         requests = []
+        memory_match = set()
         for item in spotify_playlist["tracks"]["items"] :
             title = item["track"]["name"]
             album = item["track"]["album"]["name"]
             artists = [a["name"] for a in item["track"]["artists"]]
             isrc = item["track"]["external_ids"]["isrc"]
 
-            # Query by isrc
-            requests.append(_make_query(title, album, artists, isrc, client, s, callback))
+            if not isrc in memory :
+
+                # Query track in Qobuz
+                requests.append(_make_query(title, album, artists, isrc, client, s, callback))
+            
+            else :
+
+                # Memorized track in the Spotify playlist
+                memory_match |= {isrc}
+                s.found += 1
+
 
         results = await asyncio.gather(*requests)
 
@@ -265,9 +277,10 @@ async def rip_spotify_playlist(spotify_playlist: dict) -> list[str] :
     # Fetch failed tracks
     with open(TRACKS_NOT_FOUND_PATH, "r") as f:
         failed_tracks = f.readlines()
+        os.remove(TRACKS_NOT_FOUND_PATH)
     
 
-    return failed_tracks
+    return failed_tracks, memory_match
 
 
 

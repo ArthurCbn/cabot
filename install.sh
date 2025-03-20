@@ -15,14 +15,6 @@ cp -f src/streamrip/qobuz.py $QOBUZ_PATH
 TAGGER_PATH=$(python -c "import streamrip.metadata.tagger as tagger ; print(tagger.__file__)")
 cp -f src/streamrip/tagger.py $TAGGER_PATH
 
-# Modif of tagger
-PLAYLIST_PATH=$(python -c "import streamrip.media.playlist as playlist ; print(playlist.__file__)")
-cp -f src/streamrip/playlist.py $PLAYLIST_PATH
-
-# Modif of track
-TRACK_PATH=$(python -c "import streamrip.media.track as track ; print(track.__file__)")
-cp -f src/streamrip/track.py $TRACK_PATH
-
 # Modif of metadata track
 META_TRACK_PATH=$(python -c "import streamrip.metadata.track as track ; print(track.__file__)")
 cp -f src/streamrip/metadata_track.py $META_TRACK_PATH
