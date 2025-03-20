@@ -5,13 +5,9 @@ import shutil
 from .config import (
     get_cabot_config_value,
 )
-from streamrip.db import Downloads
 from streamrip.config import DEFAULT_DOWNLOADS_DB_PATH
 from streamrip.progress import (
     _p,
-    ProgressManager,
-    clear_progress,
-    add_title,
 )
 from .convert import (
     convert_batch_to_aiff,
