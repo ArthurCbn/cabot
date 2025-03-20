@@ -1,6 +1,5 @@
 import subprocess
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 from rich.text import Text
 from pathlib import Path
 import re
@@ -8,7 +7,6 @@ import os
 import asyncio
 from contextlib import ExitStack
 from streamrip.console import console
-from streamrip.metadata import SearchResults
 from streamrip.media.playlist import Playlist, PendingPlaylistTrack
 from streamrip.client import Client
 from streamrip.client.qobuz import QobuzClient
