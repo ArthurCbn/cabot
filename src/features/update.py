@@ -4,9 +4,9 @@ from pathlib import Path
 import shutil
 from .config import (
     get_cabot_config_value,
-    DOWNLOADS_DB_PATH,
 )
 from streamrip.db import Downloads
+from streamrip.config import DEFAULT_DOWNLOADS_DB_PATH
 from streamrip.progress import (
     _p,
     ProgressManager,
@@ -104,8 +104,8 @@ def update_one_playlist(
     print(f"{playlist} scanned.   ")
 
     # Clear Downloads database
-    if DOWNLOADS_DB_PATH.exists() :
-        os.remove(DOWNLOADS_DB_PATH)
+    if Path(DEFAULT_DOWNLOADS_DB_PATH).exists() :
+        os.remove(DEFAULT_DOWNLOADS_DB_PATH)
 
     checked_memory = set()
 

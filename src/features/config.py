@@ -21,7 +21,6 @@ def get_project_root() -> Path :
 CABOT = get_project_root()
 DEFAULT_CABOT_CONFIG_PATH = CABOT / "default_config.json"
 CONFIG_PATH = CABOT / "config.json"
-DOWNLOADS_DB_PATH = CABOT / "downloads.db"
 TRACKS_NOT_FOUND_PATH = CABOT / "tracks_not_found.txt"
 CONFIG_CORRESPONDANCE = {
     ("qobuz", "email"): ("qobuz", "email_or_userid"),
@@ -98,7 +97,6 @@ def apply_cabot_config_to_streamrip() -> None :
 def initialize_config() -> None :
     apply_cabot_config_to_streamrip()
     set_streamrip_config_value("qobuz", "use_auth_token", "true")
-    set_streamrip_config_value("database", "downloads_path", str(DOWNLOADS_DB_PATH))
 
 def set_default_config() -> None :
     shutil.copy(DEFAULT_CABOT_CONFIG_PATH, CONFIG_PATH)
