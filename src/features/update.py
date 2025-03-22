@@ -39,7 +39,7 @@ def scan_playlist(playlist_path: Path) -> set[str] :
             os.remove(song)
             return memory
         
-        song_id = str(song_data["TXXX:COMMENTS"])
+        song_id = str(song_data["TXXX:ISRC"])
         memory |= {song_id}
 
         return memory
@@ -65,7 +65,7 @@ def remove_deleted_tracks(
     for song in aiff.iterdir() :
 
         song_data = AIFF(song)
-        song_id = str(song_data["TXXX:COMMENTS"])
+        song_id = str(song_data["TXXX:ISRC"])
         if song_id in unmatched_tracks :
 
             os.remove(song)

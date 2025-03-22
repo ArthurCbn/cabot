@@ -11,10 +11,6 @@ rip config path
 QOBUZ_PATH=$(python -c "import streamrip.client.qobuz as qb ; print(qb.__file__)")
 cp -f src/streamrip/qobuz.py $QOBUZ_PATH
 
-# Modif of tagger
-TAGGER_PATH=$(python -c "import streamrip.metadata.tagger as tagger ; print(tagger.__file__)")
-cp -f src/streamrip/tagger.py $TAGGER_PATH
-
 # Modif of metadata track
 META_TRACK_PATH=$(python -c "import streamrip.metadata.track as track ; print(track.__file__)")
 cp -f src/streamrip/metadata_track.py $META_TRACK_PATH
