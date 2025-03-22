@@ -1,4 +1,3 @@
-import subprocess
 from dataclasses import dataclass
 from rich.text import Text
 from pathlib import Path
@@ -10,6 +9,7 @@ from streamrip.console import console
 from streamrip.media.playlist import Playlist, PendingPlaylistTrack
 from streamrip.client import Client
 from streamrip.client.qobuz import QobuzClient
+from streamrip.client.soundcloud import SoundcloudClient
 from streamrip.config import Config
 from streamrip.db import Downloads, Database, Dummy
 from streamrip.config import DEFAULT_DOWNLOADS_DB_PATH
@@ -17,8 +17,10 @@ from .config import (
     get_cabot_config_value,
     TRACKS_NOT_FOUND_PATH,
 )
+from .convert import convert_to_flac
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyClientCredentials
+from pybalt import download
 from mutagen.flac import FLAC
 from mutagen.aiff import AIFF
 
@@ -36,11 +38,14 @@ def tag_track_id_by_track_isrc(
 
     for track in downloads_folder.glob("*.flac") :
         track_data = FLAC(track)
-        track_isrc = str(track_data["ISRC"][0])
 
-        if track_isrc in isrc_to_id_dict :
-            track_data["COMMENT"] = isrc_to_id_dict[track_isrc]
-            track_data.save()
+        if "ISRC" in track_data :
+        
+            track_isrc = str(track_data["ISRC"][0])
+
+            if track_isrc in isrc_to_id_dict :
+                track_data["COMMENT"] = isrc_to_id_dict[track_isrc]
+                track_data.save()
     
     return
 
@@ -293,7 +298,7 @@ async def rip_spotify_playlist(
             # Fail
             search_status.failed += 1
             with open(TRACKS_NOT_FOUND_PATH, "+a") as f:
-                f.write(f"'{name}' - {', '.join(artists)}\n")
+                f.write(f"QOBUZ - '{name}' - {', '.join(artists)}\n")
                 
             return None
 
@@ -406,6 +411,110 @@ async def rip_spotify_playlist(
 # endregion
 
 
-# TODO
-def get_soundcloud_playlist(playlist_url: str) -> None :
-    pass
+# region SOUNDCLOUD
+
+_CACHE_SOUNDCLOUD_PLAYLIST = {}
+async def fetch_soundcloud_playlist(url: str) -> dict :
+
+    if url in _CACHE_SOUNDCLOUD_PLAYLIST :
+        return _CACHE_SOUNDCLOUD_PLAYLIST[url]
+
+    # Log in to soundcloud client
+    config = Config.defaults()
+    client = SoundcloudClient(config)
+
+    await client.login()
+
+    # Fetch playlist
+    requested_playlist = await client.resolve_url(url)
+    full_playlist = await client._get_playlist(requested_playlist["id"])
+
+    # Memoize
+    _CACHE_SOUNDCLOUD_PLAYLIST[url] = requested_playlist
+
+    # Close the session
+    await client.session.close()
+
+    return full_playlist
+
+
+async def rip_soundcloud_playlist(
+        soundcloud_playlist: dict,
+        memory: set[str],
+        offset: int,
+        limit: int=25) -> tuple[dict[str, str],
+                                set[str],
+                                int,
+                                bool] :
+    """
+    Returns :
+        - id by metadata tag (dict (dict[str, str])
+        - Memory match (set[str])
+        - Next track index to process (int)
+        - Is the playlist fully ripped (bool)
+    """
+
+
+    # Fetch config value
+    download_folder = Path(get_cabot_config_value(["tmp_folder"]))
+
+    playlist_title = soundcloud_playlist["title"]
+    playlist_length = len(soundcloud_playlist["tracks"])
+
+    # Downloads foalder
+    downloaded_playlist_folder = download_folder / playlist_title
+
+    if not download_folder.exists() :
+        os.mkdir(download_folder)
+    if not downloaded_playlist_folder.exists() : 
+        os.mkdir(downloaded_playlist_folder)
+
+    memory_match = set()
+
+    print("Downloading from Soundcloud...")
+
+    # Extract URLs and RIP
+    memory_id_by_track_name = {}
+    failed_tracks = []
+    tracks_path = []
+    next_track = offset
+    requested_tracks = 0
+    while (requested_tracks < limit) and (next_track < playlist_length) :
+
+        track = soundcloud_playlist["tracks"][next_track]
+        track_id = str(track["id"]).split("|")[0] # Trash ID management from Streamrip
+        if not track_id in memory :
+
+            if "permalink_url" in track :
+                path = await download(track["permalink_url"], audioFormat="wav", filenameStyle="nerdy", folder_path=str(downloaded_playlist_folder))
+            
+                memory_id_by_track_name[path.stem] = track_id
+                
+                tracks_path.append(path)
+                requested_tracks += 1
+
+            else :
+                
+                failed_tracks.append(f"SOUNDCLOUD - {playlist_title} - track n°{next_track+1}")
+
+        else :
+
+            memory_match |= {track_id}
+        
+        next_track += 1
+    
+    print("Downloading from Soundcloud...Done.")
+
+
+    # Convert to FLAC and tag track ID
+    for track in tracks_path :
+        flac_track = convert_to_flac(track)
+        os.remove(track)
+
+        song_data = FLAC(flac_track)
+        song_data["COMMENT"] = str(memory_id_by_track_name[track.stem])
+        song_data.save()
+
+    return failed_tracks, memory_match, next_track, (next_track == playlist_length)
+
+# endregion

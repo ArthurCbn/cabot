@@ -1,6 +1,6 @@
 # Cabot
 
-One command for one feature : updating all your playlists (download in lossless, convert, analyse key) .
+One command for one feature : updating all your playlists from Spotify and SoundCloud (download in lossless, convert, ~analyse key~).
 
 ## Dependencies
 
@@ -28,10 +28,14 @@ Set-up your playlists' urls directly in `config.json` like so :
     "mp3_copy": "True",
     "playlists": {
         "your_1st_playlist": {
-            "spotify": "url_to_1st_spotify_playlist"
+            "spotify": "url_to_1st_spotify_playlist",
+            "soundcloud": "url_to_1st_soundcloud_playlist"
         },
         "your_2nd_playlist": {
             "spotify": "url_to_2nd_spotify_playlist"
+        },
+        "your_3rd_playlist": {
+            "soundcloud": "url_to_3rd_soundcloud_playlist"
         }
     }
 }
@@ -91,4 +95,3 @@ You can also specify certain playlists as arguments : `cabot playlist1 "another 
 ## Future features
 
 - Analyse key and automatically add it to the metadata
-- Rip from soundcloud

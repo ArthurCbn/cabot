@@ -6,3 +6,4 @@ tinytag
 toml
 mutagen
 spotipy
+pybalt
