@@ -22,7 +22,30 @@ from .key import (
     write_keys_in_flac,
 )
 from mutagen.aiff import AIFF
+from mutagen.flac import FLAC
 from mutagen._iff import EmptyChunk
+
+
+# TODO : when ripping a track that is not match by its ISRC, return searched ISRC AND found ISRC
+# Then after ripping, modify the ISRC metadata field with the original searched ISRC (the one from Spotify)
+# Therefore, when updating the playlist, we will keep in memory the Spotify corresponding ISRC of the track, 
+# and not delete it by error 
+# Maybe write this in the COMMENTS field to not loose the info that we did not find the original track...
+# In case someday I developp something to highlight these "uncertain" tracks
+
+def extract_song_id(song: Path) -> str :
+    
+    assert song.is_file(), f"{song} n'existe pas."
+
+    if song.suffix == ".flac" :
+        song_data = FLAC(song)
+        song_id = str(song_data["ISRC"][0])
+    
+    elif song.suffix == ".aiff" :
+        song_data = AIFF(song)
+        song_id = str(song_data["TXXX:ISRC"])
+
+    return song_id
 
 
 def scan_playlist(playlist_path: Path) -> set[str] :
@@ -32,13 +55,7 @@ def scan_playlist(playlist_path: Path) -> set[str] :
         if song.suffix != ".aiff" :
             return memory
         
-        try :
-            song_data = AIFF(song)
-        except EmptyChunk:
-            os.remove(song)
-            return memory
-        
-        song_id = str(song_data["TXXX:ISRC"])
+        song_id = extract_song_id(song)
         memory |= {song_id}
 
         return memory
@@ -63,8 +80,7 @@ def remove_deleted_tracks(
 
     for song in aiff.iterdir() :
 
-        song_data = AIFF(song)
-        song_id = str(song_data["TXXX:ISRC"])
+        song_id = extract_song_id(song)
         if song_id in unmatched_tracks :
 
             os.remove(song)

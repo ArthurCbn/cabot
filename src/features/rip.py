@@ -267,7 +267,7 @@ async def rip_spotify_playlist(
             artists = [a["name"] for a in item["track"]["artists"]]
             isrc = item["track"]["external_ids"]["isrc"]
 
-            if not isrc in memory :
+            if not isrc in memory : # find universal id...
 
                 # Query track in Qobuz
                 requests.append(_make_query(title, album, artists, isrc, next_track, client, s, callback))
