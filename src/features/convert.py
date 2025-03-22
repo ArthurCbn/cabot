@@ -112,4 +112,13 @@ def convert_batch_to_mp3(
 
 # endregion 
 
+# region |---| FLAC
+def convert_to_flac(
+        input_path: Path, 
+        output_folder: Path|None=None) -> Path :
+
+    return _convert_to_xxx(".flac", input_path, output_folder)
+
+# endregion
+
 # endregion

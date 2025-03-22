@@ -15,8 +15,9 @@ from .convert import (
 )
 from .rip import (
     rip_spotify_playlist,
-    get_soundcloud_playlist,
+    rip_soundcloud_playlist,
     fetch_spotify_playlist,
+    fetch_soundcloud_playlist,
     tag_track_id_by_track_isrc,
     extract_track_id,
 )
@@ -95,13 +96,12 @@ def update_one_playlist(
     print(f"Scanning downloads...", end="\r")
     memory = scan_playlist(playlist_path / "AIFF")
     print(f"Scanning downloads...Done.")
-
+    print("")
 
     # Clear Downloads database
     if Path(DEFAULT_DOWNLOADS_DB_PATH).exists() :
         os.remove(DEFAULT_DOWNLOADS_DB_PATH)
 
-    found_searched_isrc_dict = {}
     checked_memory = set()
     failed_tracks = []
 
@@ -109,12 +109,13 @@ def update_one_playlist(
     for source, url in sources.items() :
         
         # Downloads by batch
+        found_searched_isrc_dict = {}
         offset = 0
         batch_count = 1
         playlist_fully_downloaded = False
         while not playlist_fully_downloaded :
             
-            print(f"PROCESSING BATCH {batch_count}")
+            print(f"PROCESSING BATCH {batch_count} - {source}")
 
             if source == "spotify" :
 
@@ -139,22 +140,27 @@ def update_one_playlist(
                 # Write key in FLAC metadata
                 # write_keys_in_flac(download_path, key_by_id)
 
-            # TODO
+            
             elif source == "soundcloud" :
-                get_soundcloud_playlist(url) # handle offset and playlist_fully_downloaded
 
+                loop = asyncio.get_event_loop()
+                
+                # Fetch Soundcloud playlist 
+                soundcloud_playlist = loop.run_until_complete(fetch_soundcloud_playlist(url))
+
+                (batch_failed_tracks,
+                 batch_memory_match, 
+                 offset,
+                 playlist_fully_downloaded) = loop.run_until_complete(rip_soundcloud_playlist(soundcloud_playlist,
+                                                                                              memory,
+                                                                                              offset))
+
+                checked_memory |= batch_memory_match
+                failed_tracks.extend(batch_failed_tracks)
 
             # Stop progress bar
             _p.live.stop()
             _p.started = False
-
-
-            # Failed tracks
-            if failed_tracks :
-                print("The following tracks do not exist on Qobuz : ")
-                for t in failed_tracks :
-                    print(f"   -> {t.replace("\n", "")}")
-                print("")
 
 
             # New downloads
@@ -163,8 +169,7 @@ def update_one_playlist(
                 downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
 
                 # Tag the ID in metadata
-                tag_track_id_by_track_isrc(found_searched_isrc_dict, downloaded_playlist) # TODO See how to make this ok with soundcloud
-
+                tag_track_id_by_track_isrc(found_searched_isrc_dict, downloaded_playlist)
 
                 # Convert
                 print("Converting...", end="\r")
@@ -178,6 +183,14 @@ def update_one_playlist(
             
             batch_count+=1
             print("")
+
+
+    # Failed tracks
+    if failed_tracks :
+        print("The following tracks could not be downloaded : ")
+        for t in failed_tracks :
+            print(f"   -> {t.replace("\n", "")}")
+        print("")
 
 
     # Remove deleted tracks
