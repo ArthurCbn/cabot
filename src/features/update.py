@@ -17,35 +17,12 @@ from .rip import (
     rip_spotify_playlist,
     get_soundcloud_playlist,
     fetch_spotify_playlist,
+    tag_track_id_by_track_isrc,
+    extract_track_id,
 )
 from .key import (
     write_keys_in_flac,
 )
-from mutagen.aiff import AIFF
-from mutagen.flac import FLAC
-from mutagen._iff import EmptyChunk
-
-
-# TODO : when ripping a track that is not match by its ISRC, return searched ISRC AND found ISRC
-# Then after ripping, modify the ISRC metadata field with the original searched ISRC (the one from Spotify)
-# Therefore, when updating the playlist, we will keep in memory the Spotify corresponding ISRC of the track, 
-# and not delete it by error 
-# Maybe write this in the COMMENTS field to not loose the info that we did not find the original track...
-# In case someday I developp something to highlight these "uncertain" tracks
-
-def extract_song_id(song: Path) -> str :
-    
-    assert song.is_file(), f"{song} n'existe pas."
-
-    if song.suffix == ".flac" :
-        song_data = FLAC(song)
-        song_id = str(song_data["ISRC"][0])
-    
-    elif song.suffix == ".aiff" :
-        song_data = AIFF(song)
-        song_id = str(song_data["TXXX:ISRC"])
-
-    return song_id
 
 
 def scan_playlist(playlist_path: Path) -> set[str] :
@@ -55,7 +32,10 @@ def scan_playlist(playlist_path: Path) -> set[str] :
         if song.suffix != ".aiff" :
             return memory
         
-        song_id = extract_song_id(song)
+        song_id = extract_track_id(song)
+        if song_id is None :
+            os.remove(song)
+
         memory |= {song_id}
 
         return memory
@@ -80,8 +60,8 @@ def remove_deleted_tracks(
 
     for song in aiff.iterdir() :
 
-        song_id = extract_song_id(song)
-        if song_id in unmatched_tracks :
+        song_id = extract_track_id(song)
+        if (song_id is None) or (song_id in unmatched_tracks) :
 
             os.remove(song)
             mp3_track = playlist_path / "MP3" / f"{song.stem}.mp3"
@@ -121,6 +101,7 @@ def update_one_playlist(
     if Path(DEFAULT_DOWNLOADS_DB_PATH).exists() :
         os.remove(DEFAULT_DOWNLOADS_DB_PATH)
 
+    found_searched_isrc_dict = {}
     checked_memory = set()
     failed_tracks = []
 
@@ -142,11 +123,13 @@ def update_one_playlist(
 
                 # Rip playlist
                 loop = asyncio.get_event_loop()
-                (batch_failed_tracks, 
+                (batch_found_searched_isrc_dict,
+                 batch_failed_tracks, 
                  batch_memory_match, 
                  offset,
                  playlist_fully_downloaded) = loop.run_until_complete(rip_spotify_playlist(spotify_playlist, memory, offset))
 
+                found_searched_isrc_dict |= batch_found_searched_isrc_dict
                 checked_memory |= batch_memory_match
                 failed_tracks.extend(batch_failed_tracks)
 
@@ -178,6 +161,10 @@ def update_one_playlist(
             if download_path.exists() and len(list(download_path.iterdir())) > 0 :
                 
                 downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
+
+                # Tag the ID in metadata
+                tag_track_id_by_track_isrc(found_searched_isrc_dict, downloaded_playlist) # TODO See how to make this ok with soundcloud
+
 
                 # Convert
                 print("Converting...", end="\r")
