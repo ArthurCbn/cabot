@@ -19,7 +19,60 @@ from .config import (
 )
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyClientCredentials
+from mutagen.flac import FLAC
+from mutagen.aiff import AIFF
 
+
+# region ID TAGGER
+
+def tag_track_id_by_track_isrc(
+        isrc_to_id_dict: dict[str, str],
+        downloads_folder: Path) -> None :
+    """
+    Only tag FLAC tracks for now.
+    """
+
+    assert downloads_folder.is_dir(), f"{downloads_folder} n'existe pas."
+
+    for track in downloads_folder.glob("*.flac") :
+        track_data = FLAC(track)
+        track_isrc = str(track_data["ISRC"][0])
+
+        if track_isrc in isrc_to_id_dict :
+            track_data["COMMENT"] = isrc_to_id_dict[track_isrc]
+            track_data.save()
+    
+    return
+
+
+def extract_track_id(song: Path) -> str | None :
+    
+    assert song.is_file(), f"{song} n'existe pas."
+
+    # FLAC
+    if song.suffix == ".flac" :
+
+        song_data = FLAC(song)
+        if not "COMMENT" in song_data :
+            return None
+        
+        song_id = str(song_data["COMMENT"][0])
+    
+    # AIFF
+    elif song.suffix == ".aiff" :
+
+        song_data = AIFF(song)
+        if not "TXXX:COMMENT" in song_data :
+            return None
+        
+        song_id = str(song_data["TXXX:COMMENT"])
+
+    return song_id
+
+# endregion
+
+
+# region SPOTIFY
 
 _CACHE_SPOTIFY_PLAYLIST = {}
 def fetch_spotify_playlist(url: str) -> dict :
@@ -49,11 +102,21 @@ async def rip_spotify_playlist(
         spotify_playlist: dict,
         memory: set[str],
         offset: int,
-        limit: int=25) -> tuple[list[str],
+        limit: int=25) -> tuple[dict[str, str],
+                                list[str],
                                 set[str],
                                 int,
                                 bool] :
-    
+    """
+    Returns :
+        - Found (on Qobuz) ISRC -> Searched ISRC (Spotify) corresponding dict (dict[str, str])
+        - Failed tracks (list[str])
+        - Memory match (set[str])
+        - Next track index to process (int)
+        - Is the playlist fully ripped (bool)
+    """
+
+
     @dataclass(slots=True)
     class Status:
         found: int
@@ -80,18 +143,25 @@ async def rip_spotify_playlist(
             track_idx: int,
             client: Client,
             search_status: Status,
-            callback) -> tuple[int, str] | None:
+            callback) -> tuple[int, str, str, str] | None:
+        """
+        Returns :
+            - Track index in the playlist (int)
+            - Qobuz's track id (str)
+            - Found ISRC (Qobuz) (str)
+            - Searched ISRC (Spotify) (str)
+        """
 
         async def __get_track_from_album(
                 album_id: str,
                 name: str=name,
-                client: Client=client) -> str | None :
+                client: Client=client) -> tuple[str, str] | None :
 
             status, tracklist_request = await client._api_request("album/get", {"album_id": album_id})
             assert status == 200
 
             tracks = tracklist_request["tracks"]["items"]
-            track_id_by_name = {track["title"]: track["id"] for track in tracks}
+            track_id_by_name = {track["title"]: (track["id"], track["isrc"]) for track in tracks}
 
             if name in track_id_by_name :
                 return track_id_by_name[name]
@@ -108,7 +178,7 @@ async def rip_spotify_playlist(
                 name: str=name,
                 album: str=album,
                 artist: str=artists[0],
-                client: Client=client) -> str | None :
+                client: Client=client) -> tuple[str, str] | None :
             
             #
             # Query artist
@@ -180,20 +250,22 @@ async def rip_spotify_playlist(
                 
                 results = pages[0]["tracks"]["items"]
                 if len(results) > 0 :
+                    found_isrc = results[0]["isrc"]
 
-                    if results[0]["isrc"] == isrc :
+                    if found_isrc == isrc :
                         search_status.found += 1
-                        return track_idx, results[0]["id"]
+                        return track_idx, results[0]["id"], found_isrc, isrc
             
             # If not conclusive, tries by title - artists
             pages = await client.search("track", f"{name} {' '.join(artists)}", limit=1)
             if len(pages) > 0 :
                 results = pages[0]["tracks"]["items"]
                 if len(results) > 0 :
+                    found_isrc = results[0]["isrc"]
 
                     if (results[0]["title"] == name) and any(a in results[0]["performers"] for a in artists) :
                         search_status.found += 1
-                        return track_idx, results[0]["id"]
+                        return track_idx, results[0]["id"], found_isrc, isrc
             
             # Else, tries by album - artist
             pages = await client.search("album", f"{album} {' '.join(artists)}", limit=1)
@@ -202,16 +274,21 @@ async def rip_spotify_playlist(
                 if len(results) > 0 :
 
                     if results[0]["title"] == name :
-                        track_id = await __get_track_from_album(results[0]["id"])
-                        if not track_id is None :
+
+                        res_from_album = await __get_track_from_album(results[0]["id"])
+                        if not res_from_album is None :
+                            track_id, found_isrc = res_from_album
+
                             search_status.found += 1
-                            return track_idx, track_id
+                            return track_idx, track_id, found_isrc, isrc
 
             # Lastly, trie by artist > album > track
-            track_id = await __query_by_artist_album_track()
-            if not track_id is None :
+            res_from_artist = await __query_by_artist_album_track()
+            if not res_from_artist is None :
+                track_id, found_isrc = res_from_artist
+
                 search_status.found += 1
-                return track_idx, track_id
+                return track_idx, track_id, found_isrc, isrc
 
             # Fail
             search_status.failed += 1
@@ -267,7 +344,7 @@ async def rip_spotify_playlist(
             artists = [a["name"] for a in item["track"]["artists"]]
             isrc = item["track"]["external_ids"]["isrc"]
 
-            if not isrc in memory : # find universal id...
+            if not isrc in memory :
 
                 # Query track in Qobuz
                 requests.append(_make_query(title, album, artists, isrc, next_track, client, s, callback))
@@ -290,10 +367,11 @@ async def rip_spotify_playlist(
 
 
     # Build qobuz playlist
+    memory_id_by_isrc = {}
     pending_tracks = []
     for res in results :
         if not res is None :
-            pos, id = res
+            pos, id, found_isrc, searched_isrc = res
             pending_tracks.append(
                     PendingPlaylistTrack(
                         id,
@@ -304,6 +382,7 @@ async def rip_spotify_playlist(
                         pos+1,
                         db,
                     ))
+            memory_id_by_isrc[found_isrc] = searched_isrc
 
     qobuz_playlist = Playlist(playlist_title, config, client, pending_tracks)
     
@@ -322,8 +401,9 @@ async def rip_spotify_playlist(
         os.remove(TRACKS_NOT_FOUND_PATH)
     
 
-    return failed_tracks, memory_match, next_track, (next_track == playlist_length)
+    return memory_id_by_isrc, failed_tracks, memory_match, next_track, (next_track == playlist_length)
 
+# endregion
 
 
 # TODO
