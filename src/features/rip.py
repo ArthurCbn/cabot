@@ -335,7 +335,7 @@ async def rip_spotify_playlist(
 
         requests = []
         memory_match = set()
-
+        failed_tracks = []
 
         # Request by batch to prevent overloading API
         next_track = offset
@@ -347,19 +347,25 @@ async def rip_spotify_playlist(
             title = item["track"]["name"]
             album = item["track"]["album"]["name"]
             artists = [a["name"] for a in item["track"]["artists"]]
-            isrc = item["track"]["external_ids"]["isrc"]
-
-            if not isrc in memory :
-
-                # Query track in Qobuz
-                requests.append(_make_query(title, album, artists, isrc, next_track, client, s, callback))
-                requested_tracks += 1
             
-            else :
+            if "isrc" in item["track"]["external_ids"] : 
+                isrc = item["track"]["external_ids"]["isrc"]
 
-                # Memorized track in the Spotify playlist
-                memory_match |= {isrc}
-                s.found += 1
+                if not isrc in memory :
+
+                    # Query track in Qobuz
+                    requests.append(_make_query(title, album, artists, isrc, next_track, client, s, callback))
+                    requested_tracks += 1
+                
+                else :
+
+                    # Memorized track in the Spotify playlist
+                    memory_match |= {isrc}
+                    s.found += 1
+
+            else :
+                failed_tracks.append(f"QOBUZ - {title} - {', '.join(artists)}")
+                s.failed += 1
             
             next_track += 1
 
@@ -402,7 +408,7 @@ async def rip_spotify_playlist(
     
     # Fetch failed tracks
     with open(TRACKS_NOT_FOUND_PATH, "r") as f:
-        failed_tracks = f.readlines()
+        failed_tracks.extend(f.readlines())
         os.remove(TRACKS_NOT_FOUND_PATH)
     
 
