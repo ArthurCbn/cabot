@@ -366,7 +366,7 @@ async def rip_spotify_playlist(
                     s.found += 1
 
             else :
-                failed_tracks.append(f"QOBUZ - {title} - {', '.join(artists)}")
+                failed_tracks.append(f"{title} - {', '.join(artists)}")
                 s.failed += 1
             
             next_track += 1
@@ -498,7 +498,7 @@ async def rip_soundcloud_playlist(
         soundcloud_playlist: dict,
         memory: set[str],
         offset: int,
-        limit: int=25) -> tuple[list[str],
+        limit: int=10) -> tuple[list[str],
                                 set[str],
                                 int,
                                 bool] :
@@ -562,12 +562,15 @@ async def rip_soundcloud_playlist(
 
     # Convert to FLAC and tag track ID
     for track in tracks_path :
-        flac_track = convert_to_flac(track)
-        os.remove(track)
 
-        song_data = FLAC(flac_track)
-        song_data["COMMENT"] = str(memory_id_by_track_name[track.stem])
-        song_data.save()
+        # In case of double
+        if track.exists() :
+            flac_track = convert_to_flac(track)
+            os.remove(track)
+
+            song_data = FLAC(flac_track)
+            song_data["COMMENT"] = str(memory_id_by_track_name[track.stem])
+            song_data.save()
 
     return failed_tracks, memory_match, next_track, (next_track == playlist_length)
 

@@ -59,13 +59,15 @@ def scan_playlist(playlist_path: Path) -> set[str] :
 # region CLEAN
 
 def remove_deleted_tracks(
-        playlist_path: Path, 
+        playlist_path: Path,
         unmatched_tracks: set[str]) -> None :
     
     assert playlist_path.is_dir(), f"{playlist_path} n'est pas un dossier."
 
     aiff = playlist_path / "AIFF"
-
+    if not aiff.exists() :
+        return
+    
     for song in aiff.iterdir() :
 
         song_id = extract_track_id(song)
@@ -256,13 +258,14 @@ def update_one_playlist(
             print(f"PROCESSING BATCH {batch_count} - fallback to soundcloud")
             loop = asyncio.get_event_loop()
             (batch_double_failed,
-             _,
+             batch_memory_match,
              offset,
              playlist_fully_downloaded) = loop.run_until_complete(rip_soundcloud_playlist(failed_playlist,
-                                                                                          set(),
+                                                                                          memory,
                                                                                           offset))
 
             double_failed.extend(batch_double_failed)
+            checked_memory |= batch_memory_match
 
             _tag_and_convert({}, fallback_path)
             
@@ -284,6 +287,8 @@ def update_one_playlist(
     # region |---| Clean
     print(f"Cleaning playlist folder...", end="\r")
     remove_deleted_tracks(playlist_path, memory - checked_memory)
+    if fallback_path.exists() :
+        remove_deleted_tracks(fallback_path, memory - checked_memory)
     print(f"Cleaning playlist folder...Done.")
     
     print("-------------- END --------------")
