@@ -24,6 +24,8 @@ from pybalt import download
 from mutagen.flac import FLAC
 from mutagen.aiff import AIFF
 
+MIN_FALLBACK_TRACK_DURATION = 60000 # 1 min
+MAX_FALLBACK_TRACK_DURATION = 1200000 # 20 min
 
 # region ID TAGGER
 
@@ -419,6 +421,7 @@ async def rip_spotify_playlist(
 
 # region SOUNDCLOUD
 
+# region |---| Fetch
 _CACHE_SOUNDCLOUD_PLAYLIST = {}
 async def fetch_soundcloud_playlist(url: str) -> dict :
 
@@ -443,7 +446,9 @@ async def fetch_soundcloud_playlist(url: str) -> dict :
 
     return full_playlist
 
+# endregion
 
+# region |---| Search and build
 async def build_soundcloud_playlist(
         queries: list[str],
         playlist_title: str) -> tuple[dict,
@@ -475,15 +480,20 @@ async def build_soundcloud_playlist(
     }
     double_failed = []
     for track, query in res :
+        
         found = track[0]["collection"]
-        if len(found) > 0 :
+        
+        # Avoid demo and full sets
+        if len(found) > 0 and (MIN_FALLBACK_TRACK_DURATION < found[0]["duration"] < MAX_FALLBACK_TRACK_DURATION) :
             playlist["tracks"].append(found[0])
         else :
             double_failed.append(query)
     
     return playlist, double_failed
 
+# endregion
 
+# region |---| Rip
 async def rip_soundcloud_playlist(
         soundcloud_playlist: dict,
         memory: set[str],
@@ -560,5 +570,7 @@ async def rip_soundcloud_playlist(
         song_data.save()
 
     return failed_tracks, memory_match, next_track, (next_track == playlist_length)
+
+# endregion
 
 # endregion
