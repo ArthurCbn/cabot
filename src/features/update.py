@@ -26,6 +26,7 @@ from .key import (
     write_keys_in_flac,
 )
 
+# region SCAN
 
 def scan_playlist(playlist_path: Path) -> set[str] :
     
@@ -43,7 +44,8 @@ def scan_playlist(playlist_path: Path) -> set[str] :
         return memory
     
 
-    assert playlist_path.is_dir(), f"{playlist_path} n'est pas un dossier existant."
+    if not playlist_path.is_dir() :
+        return set()
 
     memory = set()
     for song in playlist_path.iterdir() :
@@ -51,6 +53,10 @@ def scan_playlist(playlist_path: Path) -> set[str] :
 
     return memory
 
+# endregion
+
+
+# region CLEAN
 
 def remove_deleted_tracks(
         playlist_path: Path, 
@@ -72,6 +78,10 @@ def remove_deleted_tracks(
     
     return
 
+# endregion
+
+
+# region UPDATE
 
 def update_one_playlist(
         playlist: str, 
@@ -79,6 +89,8 @@ def update_one_playlist(
         download_path: Path,
         playlists_folder: Path,
         duplicate_to_mp3: bool) -> None :
+
+    # region |---| Tag and Convert
 
     def _tag_and_convert(
             found_searched_isrc_dict: dict[str, str],
@@ -108,6 +120,10 @@ def update_one_playlist(
         shutil.rmtree(download_path)
 
         return
+    
+    # endregion
+
+    # region |---| Init
 
     print(f"-------------- UPDATING {playlist} --------------")
 
@@ -121,8 +137,7 @@ def update_one_playlist(
 
         if duplicate_to_mp3 :
             os.mkdir(playlist_path / "MP3")
-
-
+    
     # Scan already downloaded tracks
     print(f"Scanning downloads...", end="\r")
 
@@ -143,6 +158,10 @@ def update_one_playlist(
     failed_tracks = []
     double_failed = []
 
+    # endregion
+    
+    # region |---| Ripping
+
     # Goes through every source given for the playlist
     for source, url in sources.items() :
         
@@ -151,10 +170,12 @@ def update_one_playlist(
         offset = 0
         batch_count = 1
         playlist_fully_downloaded = False
+
         while not playlist_fully_downloaded :
             
             print(f"PROCESSING BATCH {batch_count} - {source}")
 
+            # region |---|---| Spotify
             if source == "spotify" :
 
                 # Fetch spotify playlist
@@ -178,7 +199,9 @@ def update_one_playlist(
                 # Write key in FLAC metadata
                 # write_keys_in_flac(download_path, key_by_id)
 
-            
+            # endregion
+
+            # region |---|---| Soundcloud
             elif source == "soundcloud" :
 
                 loop = asyncio.get_event_loop()
@@ -196,26 +219,30 @@ def update_one_playlist(
                 checked_memory |= batch_memory_match
                 double_failed.extend(batch_failed_tracks)
 
+            # endregion
+
             # Stop progress bar
             _p.live.stop()
             _p.started = False
 
             _tag_and_convert(found_searched_isrc_dict, playlist_path)
             
-            
             batch_count+=1
             print("")
 
 
-    # Failed tracks
+    # region |---| Failed tracks
     if failed_tracks :
 
-        print("Fetching failed tracks on Soundcloud...")
+        print("Fetching failed tracks on Soundcloud...", end="\r")
         loop = asyncio.get_event_loop()
         (failed_playlist,
          not_found) = loop.run_until_complete(build_soundcloud_playlist(failed_tracks, playlist))
         
         double_failed.extend(not_found)
+
+        print("Fetching failed tracks on Soundcloud...Done.")
+        print("")
 
         if not fallback_path.exists() :
             os.mkdir(fallback_path)
@@ -223,8 +250,10 @@ def update_one_playlist(
         # Download by batch
         offset = 0
         playlist_fully_downloaded = False
+        batch_count = 1
         while not playlist_fully_downloaded :
             
+            print(f"PROCESSING BATCH {batch_count} - fallback to soundcloud")
             loop = asyncio.get_event_loop()
             (batch_double_failed,
              _,
@@ -236,20 +265,23 @@ def update_one_playlist(
             double_failed.extend(batch_double_failed)
 
             _tag_and_convert({}, fallback_path)
-        
-        print("Fetching failed tracks on Soundcloud...Done.")
-        print("")
+            
+            batch_count += 1
+            print("")
 
+    # endregion
 
-    # Double failed tracks
+    # region |---| Double failed tracks
     if double_failed :
         print("The following tracks could not be downloaded, neither from Qobuz nor from Soundcloud :")
         for t in double_failed :
             print(f"   -> {t}")
         print("")
 
+    # endregion
 
-    # Remove deleted tracks
+
+    # region |---| Clean
     print(f"Cleaning playlist folder...", end="\r")
     remove_deleted_tracks(playlist_path, memory - checked_memory)
     print(f"Cleaning playlist folder...Done.")
@@ -257,8 +289,16 @@ def update_one_playlist(
     print("-------------- END --------------")
     print("")
 
+    # endregion
+
     return 
 
+# endregion
+
+# endregion
+
+
+# region RUN
 
 def update_playlists(playlists_to_update: list[str]|None=None) -> None :
 
@@ -286,3 +326,5 @@ def update_playlists(playlists_to_update: list[str]|None=None) -> None :
                             duplicate_to_mp3)
 
     return
+
+# endregion
