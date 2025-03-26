@@ -448,13 +448,11 @@ async def rip_soundcloud_playlist(
         soundcloud_playlist: dict,
         memory: set[str],
         offset: int,
-        limit: int=25) -> tuple[dict[str, str],
-                                set[str],
+        limit: int=25) -> tuple[set[str],
                                 int,
                                 bool] :
     """
     Returns :
-        - id by metadata tag (dict (dict[str, str])
         - Memory match (set[str])
         - Next track index to process (int)
         - Is the playlist fully ripped (bool)
@@ -481,7 +479,6 @@ async def rip_soundcloud_playlist(
 
     # Extract URLs and RIP
     memory_id_by_track_name = {}
-    failed_tracks = []
     tracks_path = []
     next_track = offset
     requested_tracks = 0
@@ -491,17 +488,12 @@ async def rip_soundcloud_playlist(
         track_id = str(track["id"]).split("|")[0] # Trash ID management from Streamrip
         if not track_id in memory :
 
-            if "permalink_url" in track :
-                path = await download(track["permalink_url"], audioFormat="wav", filenameStyle="nerdy", folder_path=str(downloaded_playlist_folder))
+            path = await download(track["permalink_url"], audioFormat="wav", filenameStyle="nerdy", folder_path=str(downloaded_playlist_folder))
+        
+            memory_id_by_track_name[path.stem] = track_id
             
-                memory_id_by_track_name[path.stem] = track_id
-                
-                tracks_path.append(path)
-                requested_tracks += 1
-
-            else :
-                
-                failed_tracks.append(f"SOUNDCLOUD - {playlist_title} - track n°{next_track+1}")
+            tracks_path.append(path)
+            requested_tracks += 1
 
         else :
 
@@ -521,6 +513,6 @@ async def rip_soundcloud_playlist(
         song_data["COMMENT"] = str(memory_id_by_track_name[track.stem])
         song_data.save()
 
-    return failed_tracks, memory_match, next_track, (next_track == playlist_length)
+    return memory_match, next_track, (next_track == playlist_length)
 
 # endregion

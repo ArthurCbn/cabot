@@ -148,15 +148,13 @@ def update_one_playlist(
                 # Fetch Soundcloud playlist 
                 soundcloud_playlist = loop.run_until_complete(fetch_soundcloud_playlist(url))
 
-                (batch_failed_tracks,
-                 batch_memory_match, 
+                (batch_memory_match, 
                  offset,
                  playlist_fully_downloaded) = loop.run_until_complete(rip_soundcloud_playlist(soundcloud_playlist,
                                                                                               memory,
                                                                                               offset))
 
                 checked_memory |= batch_memory_match
-                failed_tracks.extend(batch_failed_tracks)
 
             # Stop progress bar
             _p.live.stop()
