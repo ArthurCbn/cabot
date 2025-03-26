@@ -20,6 +20,7 @@ from .rip import (
     fetch_soundcloud_playlist,
     tag_track_id_by_track_isrc,
     extract_track_id,
+    build_soundcloud_playlist,
 )
 from .key import (
     write_keys_in_flac,
@@ -79,11 +80,41 @@ def update_one_playlist(
         playlists_folder: Path,
         duplicate_to_mp3: bool) -> None :
 
+    def _tag_and_convert(
+            found_searched_isrc_dict: dict[str, str],
+            playlist_path: Path,
+            download_path: Path=download_path,
+            duplicate_to_mp3: bool=duplicate_to_mp3) -> None :
+
+        # Check new downloads
+        if not download_path.exists() :
+            return
+        if len(list(download_path.iterdir())) == 0 :
+            return
+        
+        downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
+
+        # Tag the ID in metadata
+        tag_track_id_by_track_isrc(found_searched_isrc_dict, downloaded_playlist)
+
+        # Convert
+        print("Converting...", end="\r")
+        convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
+        if duplicate_to_mp3 :
+            # TODO Ensure already existing .aiff as converted in MP3 as well
+            convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
+        print("Converting...Done.")
+
+        shutil.rmtree(download_path)
+
+        return
+
     print(f"-------------- UPDATING {playlist} --------------")
 
     # Init playlist folders
     playlist = playlist.replace("/", " ")
     playlist_path = playlists_folder / playlist
+    fallback_path = playlist_path / "fallback"
     if not playlist_path.exists() :
         os.mkdir(playlist_path)
         os.mkdir(playlist_path / "AIFF")
@@ -94,7 +125,13 @@ def update_one_playlist(
 
     # Scan already downloaded tracks
     print(f"Scanning downloads...", end="\r")
+
     memory = scan_playlist(playlist_path / "AIFF")
+
+    # Scan fallback folder as well
+    if fallback_path.is_dir() :
+        memory |= scan_playlist(fallback_path / "AIFF")
+
     print(f"Scanning downloads...Done.")
     print("")
 
@@ -104,6 +141,7 @@ def update_one_playlist(
 
     checked_memory = set()
     failed_tracks = []
+    double_failed = []
 
     # Goes through every source given for the playlist
     for source, url in sources.items() :
@@ -148,36 +186,22 @@ def update_one_playlist(
                 # Fetch Soundcloud playlist 
                 soundcloud_playlist = loop.run_until_complete(fetch_soundcloud_playlist(url))
 
-                (batch_memory_match, 
+                (batch_failed_tracks,
+                 batch_memory_match, 
                  offset,
                  playlist_fully_downloaded) = loop.run_until_complete(rip_soundcloud_playlist(soundcloud_playlist,
                                                                                               memory,
                                                                                               offset))
 
                 checked_memory |= batch_memory_match
+                double_failed.extend(batch_failed_tracks)
 
             # Stop progress bar
             _p.live.stop()
             _p.started = False
 
-
-            # New downloads
-            if download_path.exists() and len(list(download_path.iterdir())) > 0 :
-                
-                downloaded_playlist = next(download_path.iterdir()) # Goes inside playlist folder
-
-                # Tag the ID in metadata
-                tag_track_id_by_track_isrc(found_searched_isrc_dict, downloaded_playlist)
-
-                # Convert
-                print("Converting...", end="\r")
-                convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
-                if duplicate_to_mp3 :
-                    # TODO Ensure already existing .aiff as converted in MP3 as well
-                    convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
-                print("Converting...Done.")
-
-                shutil.rmtree(download_path)
+            _tag_and_convert(found_searched_isrc_dict, playlist_path)
+            
             
             batch_count+=1
             print("")
@@ -185,9 +209,43 @@ def update_one_playlist(
 
     # Failed tracks
     if failed_tracks :
-        print("The following tracks could not be downloaded : ")
-        for t in failed_tracks :
-            print(f"   -> {t.replace("\n", "")}")
+
+        print("Fetching failed tracks on Soundcloud...")
+        loop = asyncio.get_event_loop()
+        (failed_playlist,
+         not_found) = loop.run_until_complete(build_soundcloud_playlist(failed_tracks, playlist))
+        
+        double_failed.extend(not_found)
+
+        if not fallback_path.exists() :
+            os.mkdir(fallback_path)
+
+        # Download by batch
+        offset = 0
+        playlist_fully_downloaded = False
+        while not playlist_fully_downloaded :
+            
+            loop = asyncio.get_event_loop()
+            (batch_double_failed,
+             _,
+             offset,
+             playlist_fully_downloaded) = loop.run_until_complete(rip_soundcloud_playlist(failed_playlist,
+                                                                                          set(),
+                                                                                          offset))
+
+            double_failed.extend(batch_double_failed)
+
+            _tag_and_convert({}, fallback_path)
+        
+        print("Fetching failed tracks on Soundcloud...Done.")
+        print("")
+
+
+    # Double failed tracks
+    if double_failed :
+        print("The following tracks could not be downloaded, neither from Qobuz nor from Soundcloud :")
+        for t in double_failed :
+            print(f"   -> {t}")
         print("")
 
 

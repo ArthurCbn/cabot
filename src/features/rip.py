@@ -298,7 +298,7 @@ async def rip_spotify_playlist(
             # Fail
             search_status.failed += 1
             with open(TRACKS_NOT_FOUND_PATH, "+a") as f:
-                f.write(f"QOBUZ - '{name}' - {', '.join(artists)}\n")
+                f.write(f"{name} - {', '.join(artists)}\n")
                 
             return None
 
@@ -444,11 +444,52 @@ async def fetch_soundcloud_playlist(url: str) -> dict :
     return full_playlist
 
 
+async def build_soundcloud_playlist(
+        queries: list[str],
+        playlist_title: str) -> tuple[dict,
+                                      list[str]] :
+    
+    async def _make_query(query: str) -> tuple[dict, str] :
+        res = await client.search("track", query, limit=1)
+        return res, query
+
+
+    # Search tracks
+    config = Config.defaults()
+    client = SoundcloudClient(config)
+
+    await client.login()
+
+    requests = []
+    for query in queries :
+        requests.append(_make_query(query))
+    
+    res = await asyncio.gather(*requests)
+
+    await client.session.close()
+
+    # Build playlist
+    playlist = {
+        "title": playlist_title,
+        "tracks": [],    
+    }
+    double_failed = []
+    for track, query in res :
+        found = track[0]["collection"]
+        if len(found) > 0 :
+            playlist["tracks"].append(found[0])
+        else :
+            double_failed.append(query)
+    
+    return playlist, double_failed
+
+
 async def rip_soundcloud_playlist(
         soundcloud_playlist: dict,
         memory: set[str],
         offset: int,
-        limit: int=25) -> tuple[set[str],
+        limit: int=25) -> tuple[list[str],
+                                set[str],
                                 int,
                                 bool] :
     """
@@ -457,7 +498,6 @@ async def rip_soundcloud_playlist(
         - Next track index to process (int)
         - Is the playlist fully ripped (bool)
     """
-
 
     # Fetch config value
     download_folder = Path(get_cabot_config_value(["tmp_folder"]))
@@ -475,10 +515,12 @@ async def rip_soundcloud_playlist(
 
     memory_match = set()
 
-    print("Downloading from Soundcloud...")
+    if playlist_length :
+        print("Downloading from Soundcloud...")
 
     # Extract URLs and RIP
     memory_id_by_track_name = {}
+    failed_tracks = []
     tracks_path = []
     next_track = offset
     requested_tracks = 0
@@ -487,13 +529,16 @@ async def rip_soundcloud_playlist(
         track = soundcloud_playlist["tracks"][next_track]
         track_id = str(track["id"]).split("|")[0] # Trash ID management from Streamrip
         if not track_id in memory :
-
-            path = await download(track["permalink_url"], audioFormat="wav", filenameStyle="nerdy", folder_path=str(downloaded_playlist_folder))
-        
-            memory_id_by_track_name[path.stem] = track_id
             
-            tracks_path.append(path)
-            requested_tracks += 1
+            try :
+                path = await download(track["permalink_url"], audioFormat="wav", filenameStyle="nerdy", folder_path=str(downloaded_playlist_folder))
+            except :
+                failed_tracks.append(track["title"])
+            else :
+                memory_id_by_track_name[path.stem] = track_id
+                
+                tracks_path.append(path)
+                requested_tracks += 1
 
         else :
 
@@ -501,7 +546,8 @@ async def rip_soundcloud_playlist(
         
         next_track += 1
     
-    print("Downloading from Soundcloud...Done.")
+    if playlist_length :
+        print("Downloading from Soundcloud...Done.")
 
 
     # Convert to FLAC and tag track ID
@@ -513,6 +559,6 @@ async def rip_soundcloud_playlist(
         song_data["COMMENT"] = str(memory_id_by_track_name[track.stem])
         song_data.save()
 
-    return memory_match, next_track, (next_track == playlist_length)
+    return failed_tracks, memory_match, next_track, (next_track == playlist_length)
 
 # endregion
