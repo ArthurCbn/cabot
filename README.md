@@ -12,7 +12,7 @@ ffmpeg
 
 ### Linux - using bash
 ```
-git clone https://ArthurCbn:**key**@github.com/ArthurCbn/cabot.git
+git clone git@github.com:ArthurCbn/cabot.git
 cd cabot
 bash installation.sh
 source ~/.bashrc
