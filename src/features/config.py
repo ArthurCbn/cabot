@@ -21,7 +21,6 @@ def get_project_root() -> Path :
 CABOT = get_project_root()
 DEFAULT_CABOT_CONFIG_PATH = CABOT / "default_config.json"
 CONFIG_PATH = CABOT / "config.json"
-TRACKS_NOT_FOUND_PATH = CABOT / "tracks_not_found.txt"
 CONFIG_CORRESPONDANCE = {
     ("qobuz", "email"): ("qobuz", "email_or_userid"),
     ("qobuz", "token"): ("qobuz", "password_or_token"),

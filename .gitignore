@@ -9,4 +9,3 @@ sandbox
 *.db
 config.json
 tmp_download
-tracks_not_found.txt

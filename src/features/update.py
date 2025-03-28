@@ -157,7 +157,7 @@ def update_one_playlist(
         os.remove(DEFAULT_DOWNLOADS_DB_PATH)
 
     checked_memory = set()
-    failed_tracks = []
+    failed_tracks = {}
     double_failed = []
 
     # endregion
@@ -193,7 +193,7 @@ def update_one_playlist(
 
                 found_searched_isrc_dict |= batch_found_searched_isrc_dict
                 checked_memory |= batch_memory_match
-                failed_tracks.extend(batch_failed_tracks)
+                failed_tracks |= batch_failed_tracks
 
                 # Analyse it
                 # TODO when I find a working API
