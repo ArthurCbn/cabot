@@ -15,7 +15,6 @@ from streamrip.db import Downloads, Database, Dummy
 from streamrip.config import DEFAULT_DOWNLOADS_DB_PATH
 from .config import (
     get_cabot_config_value,
-    TRACKS_NOT_FOUND_PATH,
 )
 from .convert import convert_to_flac
 from spotipy import Spotify
@@ -110,14 +109,14 @@ async def rip_spotify_playlist(
         memory: set[str],
         offset: int,
         limit: int=25) -> tuple[dict[str, str],
-                                list[str],
+                                dict[str, str],
                                 set[str],
                                 int,
                                 bool] :
     """
     Returns :
         - Found (on Qobuz) ISRC -> Searched ISRC (Spotify) corresponding dict (dict[str, str])
-        - Failed tracks (list[str])
+        - Failed tracks, storing ISRC as well as title - artists (dict[str, str])
         - Memory match (set[str])
         - Next track index to process (int)
         - Is the playlist fully ripped (bool)
@@ -150,12 +149,12 @@ async def rip_spotify_playlist(
             track_idx: int,
             client: Client,
             search_status: Status,
-            callback) -> tuple[int, str, str, str] | None:
+            callback) -> tuple[int, str | None, str, str]:
         """
         Returns :
             - Track index in the playlist (int)
-            - Qobuz's track id (str)
-            - Found ISRC (Qobuz) (str)
+            - Qobuz's track id (str), None if not found
+            - Found ISRC (Qobuz), query for fallback if not found (str) 
             - Searched ISRC (Spotify) (str)
         """
 
@@ -299,10 +298,9 @@ async def rip_spotify_playlist(
 
             # Fail
             search_status.failed += 1
-            with open(TRACKS_NOT_FOUND_PATH, "+a") as f:
-                f.write(f"{name} - {', '.join(artists)}\n")
-                
-            return None
+            fallback_query = f"{name} - {', '.join(artists)}"
+
+            return track_idx, None, fallback_query, isrc
 
 
     # Fetch config values
@@ -325,10 +323,7 @@ async def rip_spotify_playlist(
     await client.login()
 
 
-    # Fetch qobuz ids
-    with open(TRACKS_NOT_FOUND_PATH, "w") as f:
-        f.write("")
-
+    # Fetch Qobuz ids
     s = Status(0, 0, playlist_length)
     with console.status(s.text(), spinner="moon") as status:
         
@@ -337,7 +332,7 @@ async def rip_spotify_playlist(
 
         requests = []
         memory_match = set()
-        failed_tracks = []
+        failed_tracks = {}
 
         # Request by batch to prevent overloading API
         next_track = offset
@@ -366,7 +361,8 @@ async def rip_spotify_playlist(
                     s.found += 1
 
             else :
-                failed_tracks.append(f"{title} - {', '.join(artists)}")
+                fallback_query = f"{title} - {', '.join(artists)}"
+                failed_tracks[fallback_query] = None
                 s.failed += 1
             
             next_track += 1
@@ -382,12 +378,12 @@ async def rip_spotify_playlist(
     # Build qobuz playlist
     memory_id_by_isrc = {}
     pending_tracks = []
-    for res in results :
-        if not res is None :
-            pos, id, found_isrc, searched_isrc = res
+    for pos, qobuz_id, found, searched_isrc in results :
+        if not qobuz_id is None :
+            found_isrc = found
             pending_tracks.append(
                     PendingPlaylistTrack(
-                        id,
+                        qobuz_id,
                         client,
                         config,
                         download_folder / playlist_title.replace("/", " "),
@@ -396,6 +392,9 @@ async def rip_spotify_playlist(
                         db,
                     ))
             memory_id_by_isrc[found_isrc] = searched_isrc
+        else :
+            fallback_query = found
+            failed_tracks[fallback_query] = searched_isrc
 
     qobuz_playlist = Playlist(playlist_title, config, client, pending_tracks)
     
@@ -407,12 +406,6 @@ async def rip_spotify_playlist(
     # Close the session
     await client.session.close()
 
-    
-    # Fetch failed tracks
-    with open(TRACKS_NOT_FOUND_PATH, "r") as f:
-        failed_tracks.extend(f.readlines())
-        os.remove(TRACKS_NOT_FOUND_PATH)
-    
 
     return memory_id_by_isrc, failed_tracks, memory_match, next_track, (next_track == playlist_length)
 
@@ -450,13 +443,15 @@ async def fetch_soundcloud_playlist(url: str) -> dict :
 
 # region |---| Search and build
 async def build_soundcloud_playlist(
-        queries: list[str],
+        fallback_queries: dict[str, str],
         playlist_title: str) -> tuple[dict,
                                       list[str]] :
     
-    async def _make_query(query: str) -> tuple[dict, str] :
+    async def _make_query(
+            query: str,
+            spotify_isrc: str) -> tuple[dict, str] :
         res = await client.search("track", query, limit=1)
-        return res, query
+        return res, query, spotify_isrc
 
 
     # Search tracks
@@ -466,8 +461,8 @@ async def build_soundcloud_playlist(
     await client.login()
 
     requests = []
-    for query in queries :
-        requests.append(_make_query(query))
+    for query, spotify_isrc in fallback_queries.items() :
+        requests.append(_make_query(query, spotify_isrc))
     
     res = await asyncio.gather(*requests)
 
@@ -479,13 +474,15 @@ async def build_soundcloud_playlist(
         "tracks": [],    
     }
     double_failed = []
-    for track, query in res :
+    for track, query, spotify_isrc in res :
         
         found = track[0]["collection"]
         
         # Avoid demo and full sets
         if len(found) > 0 and (MIN_FALLBACK_TRACK_DURATION < found[0]["duration"] < MAX_FALLBACK_TRACK_DURATION) :
-            playlist["tracks"].append(found[0])
+            track = found[0]
+            track["isrc"] = spotify_isrc    # This allow to keep track of the originally searched isrc, but is not used at the moment
+            playlist["tracks"].append(track)
         else :
             double_failed.append(query)
     
@@ -504,6 +501,7 @@ async def rip_soundcloud_playlist(
                                 bool] :
     """
     Returns :
+        - Double failed track (list[str])
         - Memory match (set[str])
         - Next track index to process (int)
         - Is the playlist fully ripped (bool)
@@ -538,6 +536,11 @@ async def rip_soundcloud_playlist(
 
         track = soundcloud_playlist["tracks"][next_track]
         track_id = str(track["id"]).split("|")[0] # Trash ID management from Streamrip
+        
+        # THIS IS BAD BECAUSE FALLBACK TRACKS WONT BE RE TRIED ON NEXT UPDATE (until another refactor at least)
+        # if "isrc" in track :
+        #     track_id = track["isrc"] # Manually added original Spotify ISRC for memory management (fallback)
+        
         if not track_id in memory :
             
             try :
