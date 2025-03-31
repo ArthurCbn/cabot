@@ -7,3 +7,4 @@ toml
 mutagen
 spotipy
 pybalt
+librosa
