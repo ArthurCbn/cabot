@@ -5,18 +5,25 @@ One command for one feature : updating all your playlists from Spotify and Sound
 ## Dependencies
 
 ```
+Python
 ffmpeg
 ```
 
+> Get ffmpeg [here](https://www.ffmpeg.org/download.html).
+
 ## Installation
 
-### Linux - using bash
+### Mac / Linux - using bash
 ```
 git clone git@github.com:ArthurCbn/cabot.git
 cd cabot
 bash installation.sh
 source ~/.bashrc
 ```
+
+### Windows - using Gitbash
+1. Install [git bash](https://git-scm.com/downloads/win)
+2. See above for installation using bash
 
 ## Setup
 
@@ -72,7 +79,7 @@ To do so, go [here](https://developer.spotify.com/) and follow these steps :
 2. Click on your profile (top right corner), then "Dashboard"
 3. Click "Create app"
 4. Fill in the form with bullshit info (this won't change anything)
-   For "Redirects URls", you can enter 'https://example.org/callback'
+   For "Redirects URls", you can put 'https://example.org/callback'
 6. Click "Save"
 7. Go to "Settings" on the new 'app' you just created
 
