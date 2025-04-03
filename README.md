@@ -11,7 +11,7 @@ Tracks that are downloaded from Soundcloud instead of Qobuz are kept apart in th
 > The download quality from Soundcloud isn't true lossless (I think), but still better than mp3.
 
 >[!Tip]
->When selecting your Qobuz credentials, try several countries as the library isn't the same evrywhere on earth. To my experience, the best countries for Qobuz ripping are France, Germany.
+>When selecting your Qobuz credentials, try several countries as the library isn't the same everywhere on earth. To my experience, the best countries for Qobuz ripping are France, Germany.
 
 
 ## Dependencies
