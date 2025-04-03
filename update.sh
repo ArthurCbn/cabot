@@ -9,3 +9,6 @@ pip install -r requirements.txt
 
 # Initialize streamrip config file
 rip config path 
+
+# Fix streamrip
+bash .fix_streamrip.sh
