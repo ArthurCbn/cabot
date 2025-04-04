@@ -3,15 +3,18 @@
 One command for one feature : updating all your playlists from Spotify and SoundCloud (download in lossless, convert, ~analyse key~).
 This keeps your downloaded tracks up-tp-date with your Spotify and Soundcloud playlists so that :
 - If you add a track to your Spotify or Soundcloud playlist, it will be downloaded and added to the right folder,
-- If you remove a track, it will also removed from your downloaded tracks.
+- If you remove a track, it will also be removed from your downloaded tracks.
 
 Cabot first tries to download **from Qobuz in lossless quality**, if the track doesn't exist there, it will search for it on Soundcloud.
-Tracks that are downloaded from Soundcloud instead of Qobuz are kept apart in the "fallback" subfolder of your playlist. Keep in mind that searching for a track in Soundcloud isn't always perfect, so **double-check every tracks in your "fallback" folders**.
 
+Tracks that are downloaded from Soundcloud instead of Qobuz are kept apart in the "fallback" subfolders of your playlists. After updating your playlists, **double-check the "fallback" folders** : 
+- If a track corresponds to what you wanted, **move it out of the fallback folder into the corresponding folder** ("AIFF" or "MP3") : this way it will be _locked_ and cabot won't try to donwload it again from Qobuz or Soundcloud (and risk overwriting it),
+- Else, you can keep it here, but keep in mind that cabot will try to download it again and might overwrite it if it finds another _better_ version from Qobuz or Soundcloud.
+  
 > The download quality from Soundcloud isn't true lossless (I think), but still better than mp3.
 
 >[!Tip]
->When selecting your Qobuz credentials, try several countries as the library isn't the same everywhere on earth. To my experience, the best countries for Qobuz ripping are France, Germany.
+>When selecting your Qobuz credentials, try several countries as the library isn't the same everywhere on earth. To my experience, the best countries for Qobuz ripping are **France**, **Germany**.
 
 
 ## Dependencies
