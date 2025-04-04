@@ -143,11 +143,12 @@ def update_one_playlist(
     # Scan already downloaded tracks
     print(f"Scanning downloads...", end="\r")
 
-    memory = scan_playlist(playlist_path / "AIFF")
+    memory_success = scan_playlist(playlist_path / "AIFF")
+    memory_fallback = set()
 
     # Scan fallback folder as well
     if fallback_path.is_dir() :
-        memory |= scan_playlist(fallback_path / "AIFF")
+        memory_fallback |= scan_playlist(fallback_path / "AIFF")
 
     print(f"Scanning downloads...Done.")
     print("")
@@ -189,7 +190,7 @@ def update_one_playlist(
                  batch_failed_tracks, 
                  batch_memory_match, 
                  offset,
-                 playlist_fully_downloaded) = loop.run_until_complete(rip_spotify_playlist(spotify_playlist, memory, offset))
+                 playlist_fully_downloaded) = loop.run_until_complete(rip_spotify_playlist(spotify_playlist, memory_success, offset))
 
                 found_searched_isrc_dict |= batch_found_searched_isrc_dict
                 checked_memory |= batch_memory_match
@@ -215,7 +216,7 @@ def update_one_playlist(
                  batch_memory_match, 
                  offset,
                  playlist_fully_downloaded) = loop.run_until_complete(rip_soundcloud_playlist(soundcloud_playlist,
-                                                                                              memory,
+                                                                                              memory_success,
                                                                                               offset))
 
                 checked_memory |= batch_memory_match
@@ -261,7 +262,7 @@ def update_one_playlist(
              batch_memory_match,
              offset,
              playlist_fully_downloaded) = loop.run_until_complete(rip_soundcloud_playlist(failed_playlist,
-                                                                                          memory,
+                                                                                          memory_fallback,
                                                                                           offset))
 
             double_failed.extend(batch_double_failed)
@@ -286,9 +287,9 @@ def update_one_playlist(
 
     # region |---| Clean
     print(f"Cleaning playlist folder...", end="\r")
-    remove_deleted_tracks(playlist_path, memory - checked_memory)
+    remove_deleted_tracks(playlist_path, memory_success - checked_memory)
     if fallback_path.exists() :
-        remove_deleted_tracks(fallback_path, memory - checked_memory)
+        remove_deleted_tracks(fallback_path, memory_fallback - checked_memory)
     print(f"Cleaning playlist folder...Done.")
     
     print("-------------- END --------------")
