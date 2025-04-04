@@ -5,6 +5,8 @@ This keeps your downloaded tracks up-tp-date with your Spotify and Soundcloud pl
 - If you add a track to your Spotify or Soundcloud playlist, it will be downloaded and added to the right folder,
 - If you remove a track, it will also be removed from your downloaded tracks.
 
+> **DISCLAIMER** : Downloading your whole library can take quite some time (downloads from Soundcloud take ages for some reason...) : for instance my library of 1500 tracks can take up to 3-4h to be fully downloaded.
+
 Cabot first tries to download **from Qobuz in lossless quality**, if the track doesn't exist there, it will search for it on Soundcloud.
 
 Tracks that are downloaded from Soundcloud instead of Qobuz are kept apart in the "fallback" subfolders of your playlists. After updating your playlists, **double-check the "fallback" folders** : 
