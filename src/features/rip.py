@@ -481,7 +481,7 @@ async def build_soundcloud_playlist(
         # Avoid demo and full sets
         if len(found) > 0 and (MIN_FALLBACK_TRACK_DURATION < found[0]["duration"] < MAX_FALLBACK_TRACK_DURATION) :
             track = found[0]
-            track["isrc"] = spotify_isrc    # This allow to keep track of the originally searched isrc, but is not used at the moment
+            track["isrc"] = spotify_isrc    # This allows to keep track of the originally searched isrc
             playlist["tracks"].append(track)
         else :
             double_failed.append(query)
@@ -535,11 +535,10 @@ async def rip_soundcloud_playlist(
     while (requested_tracks < limit) and (next_track < playlist_length) :
 
         track = soundcloud_playlist["tracks"][next_track]
-        track_id = str(track["id"]).split("|")[0] # Trash ID management from Streamrip
         
-        # THIS IS BAD BECAUSE FALLBACK TRACKS WONT BE RE TRIED ON NEXT UPDATE (until another refactor at least)
-        # if "isrc" in track :
-        #     track_id = track["isrc"] # Manually added original Spotify ISRC for memory management (fallback)
+        track_id = str(track["id"]).split("|")[0] # Trash ID management from Streamrip
+        if "isrc" in track :
+            track_id = track["isrc"] # Manually added original Spotify ISRC for memory management (fallback)
         
         if not track_id in memory :
             
