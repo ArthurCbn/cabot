@@ -22,10 +22,12 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from pybalt import download
 from mutagen.flac import FLAC
 from mutagen.aiff import AIFF
+from mutagen.mp3 import MP3
 
 MIN_FALLBACK_TRACK_DURATION = 60000 # 1 min
 MAX_FALLBACK_TRACK_DURATION = 1200000 # 20 min
 
+# TODO REFACTOR move elsewhere
 # region ID TAGGER
 
 def tag_track_id_by_track_isrc(
@@ -73,6 +75,13 @@ def extract_track_id(song: Path) -> str | None :
         
         song_id = str(song_data["TXXX:COMMENT"])
 
+    # MP3 - More complex than aiff for some reason...
+    elif song.suffix == ".mp3" :
+
+        song_data = MP3(song)
+        tkey_frame = song_data.tags.get('TXXX:COMMENT')
+        
+        song_id = str(tkey_frame.text[0])
     return song_id
 
 # endregion
@@ -108,7 +117,7 @@ async def rip_spotify_playlist(
         spotify_playlist: dict,
         memory: set[str],
         offset: int,
-        limit: int=25) -> tuple[dict[str, str],
+        limit: int=15) -> tuple[dict[str, str],
                                 dict[str, str],
                                 set[str],
                                 int,
