@@ -7,3 +7,5 @@ toml
 mutagen
 spotipy
 pybalt
+beautifulsoup4
+playwright

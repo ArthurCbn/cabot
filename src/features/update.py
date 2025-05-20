@@ -23,7 +23,11 @@ from .rip import (
     build_soundcloud_playlist,
 )
 from .key import (
-    write_keys_in_flac,
+    write_keys_in_aiff,
+    write_keys_in_mp3,
+    scrape_keys_from_tunebat,
+    scan_FLAC_folder_for_key_queries,
+    convert_keys,
 )
 
 # region SCAN
@@ -111,13 +115,23 @@ def update_one_playlist(
         # Tag the ID in metadata
         tag_track_id_by_track_isrc(found_searched_isrc_dict, downloaded_playlist)
 
+        # Scrape the keys
+        queries = scan_FLAC_folder_for_key_queries(downloaded_playlist)
+        keys = scrape_keys_from_tunebat(queries)
+        keys = convert_keys(keys)
+
         # Convert
         print("Converting...", end="\r")
-        convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
+        aiff_files = convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
         if duplicate_to_mp3 :
             # TODO Ensure already existing .aiff as converted in MP3 as well
-            convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
+            mp3_files = convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
         print("Converting...Done.")
+
+        # Tag the key
+        write_keys_in_aiff(aiff_files, keys)
+        if duplicate_to_mp3 :
+            write_keys_in_mp3(mp3_files, keys)
 
         shutil.rmtree(download_path)
 
@@ -190,18 +204,13 @@ def update_one_playlist(
                  batch_failed_tracks, 
                  batch_memory_match, 
                  offset,
-                 playlist_fully_downloaded) = loop.run_until_complete(rip_spotify_playlist(spotify_playlist, memory_success, offset))
+                 playlist_fully_downloaded) = loop.run_until_complete(rip_spotify_playlist(spotify_playlist, 
+                                                                                           memory_success, 
+                                                                                           offset))
 
                 found_searched_isrc_dict |= batch_found_searched_isrc_dict
                 checked_memory |= batch_memory_match
                 failed_tracks |= batch_failed_tracks
-
-                # Analyse it
-                # TODO when I find a working API
-
-                # Write key in FLAC metadata
-                # write_keys_in_flac(download_path, key_by_id)
-
             # endregion
 
             # region |---|---| Soundcloud
@@ -221,7 +230,6 @@ def update_one_playlist(
 
                 checked_memory |= batch_memory_match
                 double_failed.extend(batch_failed_tracks)
-
             # endregion
 
             # Stop progress bar
@@ -291,7 +299,7 @@ def update_one_playlist(
     if fallback_path.exists() :
         remove_deleted_tracks(fallback_path, memory_fallback - checked_memory)
     print(f"Cleaning playlist folder...Done.")
-    
+
     print("-------------- END --------------")
     print("")
 
