@@ -1,6 +1,7 @@
 import os
 import asyncio
 from pathlib import Path
+from queue import Queue
 import shutil
 from .config import (
     get_cabot_config_value,
@@ -23,11 +24,7 @@ from .rip import (
     build_soundcloud_playlist,
 )
 from .key import (
-    write_keys_in_aiff,
-    write_keys_in_mp3,
-    scrape_keys_from_tunebat,
     scan_FLAC_folder_for_key_queries,
-    convert_keys,
 )
 
 # region SCAN
@@ -89,20 +86,26 @@ def remove_deleted_tracks(
 
 # region UPDATE
 
-def update_one_playlist(
+def _update_one_playlist(
         playlist: str, 
         sources: dict[str, str],
         download_path: Path,
         playlists_folder: Path,
-        duplicate_to_mp3: bool) -> None :
-
+        duplicate_to_mp3: bool,
+        key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None]) -> None :
+    """
+    This function should never be called on its own as the multi-threading is handled by its mother function : "update_playlists"
+    """
+    
     # region |---| Tag and Convert
 
     def _tag_and_convert(
             found_searched_isrc_dict: dict[str, str],
             playlist_path: Path,
+            tag_keys: bool,
             download_path: Path=download_path,
-            duplicate_to_mp3: bool=duplicate_to_mp3) -> None :
+            duplicate_to_mp3: bool=duplicate_to_mp3,
+            key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None]=key_tag_queue) -> None :
 
         # Check new downloads
         if not download_path.exists() :
@@ -115,23 +118,19 @@ def update_one_playlist(
         # Tag the ID in metadata
         tag_track_id_by_track_isrc(found_searched_isrc_dict, downloaded_playlist)
 
-        # Scrape the keys
-        queries = scan_FLAC_folder_for_key_queries(downloaded_playlist)
-        keys = scrape_keys_from_tunebat(queries)
-        keys = convert_keys(keys)
-
         # Convert
         print("Converting...", end="\r")
         aiff_files = convert_batch_to_aiff(downloaded_playlist, [".flac"], playlist_path / "AIFF")
+        mp3_files = []
         if duplicate_to_mp3 :
             # TODO Ensure already existing .aiff as converted in MP3 as well
             mp3_files = convert_batch_to_mp3(downloaded_playlist, [".flac"], playlist_path / "MP3")
         print("Converting...Done.")
 
-        # Tag the key
-        write_keys_in_aiff(aiff_files, keys)
-        if duplicate_to_mp3 :
-            write_keys_in_mp3(mp3_files, keys)
+        # Send the job to the queue, handled in another thread
+        if tag_keys :
+            queries = scan_FLAC_folder_for_key_queries(downloaded_playlist)
+            key_tag_queue.put((aiff_files, mp3_files, queries))
 
         shutil.rmtree(download_path)
 
@@ -236,7 +235,9 @@ def update_one_playlist(
             _p.live.stop()
             _p.started = False
 
-            _tag_and_convert(found_searched_isrc_dict, playlist_path)
+            _tag_and_convert(found_searched_isrc_dict, 
+                             playlist_path, 
+                             tag_keys=(source == "spotify")) # Tracks from soundcloud directly are almost never on TuneBat
             
             batch_count+=1
             print("")
@@ -275,8 +276,8 @@ def update_one_playlist(
 
             double_failed.extend(batch_double_failed)
             checked_memory |= batch_memory_match
-
-            _tag_and_convert({}, fallback_path)
+            
+            _tag_and_convert({}, fallback_path, tag_keys=True)
             
             batch_count += 1
             print("")
@@ -286,12 +287,11 @@ def update_one_playlist(
     # region |---| Double failed tracks
     if double_failed :
         print("The following tracks could not be downloaded, neither from Qobuz nor from Soundcloud :")
-        for t in double_failed :
-            print(f"   -> {t}")
+        for title, artists in double_failed :
+            print(f"   -> {title} - {artists}")
         print("")
 
     # endregion
-
 
     # region |---| Clean
     print(f"Cleaning playlist folder...", end="\r")
@@ -314,7 +314,9 @@ def update_one_playlist(
 
 # region RUN
 
-def update_playlists(playlists_to_update: list[str]|None=None) -> None :
+def update_playlists(
+        key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None],
+        playlists_to_update: list[str]|None=None) -> None :
 
     duplicate_to_mp3 = bool(get_cabot_config_value(["mp3_copy"]))
     download_path = Path(get_cabot_config_value(["tmp_folder"]))
@@ -325,19 +327,26 @@ def update_playlists(playlists_to_update: list[str]|None=None) -> None :
     if not playlists_folder.exists() :
         os.mkdir(playlists_folder)
 
+    # Initialize asynchronous loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     playlists_to_update = playlists_to_update or list(playlists.keys())
-
     for playlist in playlists_to_update :
 
         assert playlist in playlists, f"{playlist} is not configured, please fill `config.json` correctly."
 
         sources = playlists[playlist]
 
-        update_one_playlist(playlist,
-                            sources,
-                            download_path,
-                            playlists_folder,
-                            duplicate_to_mp3)
+        _update_one_playlist(playlist=playlist,
+                            sources=sources,
+                            download_path=download_path,
+                            playlists_folder=playlists_folder,
+                            duplicate_to_mp3=duplicate_to_mp3,
+                            key_tag_queue=key_tag_queue)
+    
+    # Signal the key tagger that ripping is done
+    key_tag_queue.put(None)
 
     return
 

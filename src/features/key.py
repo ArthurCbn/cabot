@@ -4,11 +4,17 @@ from mutagen.aiff import AIFF
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TKEY
 import random as rd
+from queue import Queue
 import re
+import os
 from bs4 import BeautifulSoup
+import traceback
 from playwright.sync_api import sync_playwright, Page
 from time import sleep
-from .rip import extract_track_id
+from .rip import (
+    extract_track_id,
+    SPOTIFY_BATCH_SIZE,
+)
 
 TUNEBAT_URL = "https://tunebat.com/Search?q="
 
@@ -38,17 +44,33 @@ PITCH_CLASS_TO_CAMELOT = {
     ("11", "0"): "10A",
     ("11", "1"): "1B",
 }
+UNSAFE_CHAR = ["'", "&", "{", "}", "#"]
 
+SCRAPING_BETWEEN_WAIT_S = 3
+SCRAPING_AFTER_WAIT_S = 30
 
+# region UTILS
+
+# region |---| sanitizer
+def sanitize_string_for_html_search(string: str) -> str :
+    
+    for c in UNSAFE_CHAR :
+        string = string.replace(c, "")
+    
+    return string.strip()
+# endregion
+
+# region |---| taggers
 def write_keys_in_aiff(songs: list[Path], id_to_key_dict: dict[str, str]) -> None :
 
     for song_path in songs :
-        song_data = AIFF(song_path)
-        song_id = extract_track_id(song_path)
+        if song_path.exists() : # TODO INVESTIGATE THIS BUG : FILE NOT EXIST ERROR SOME TIME AND SOME TIME NOT ??
+            song_data = AIFF(song_path)
+            song_id = extract_track_id(song_path)
 
-        if song_id in id_to_key_dict :
-            song_data.tags.add(TKEY(encoding=3, text=id_to_key_dict[song_id]))
-        song_data.save()
+            if song_id in id_to_key_dict :
+                song_data.tags.add(TKEY(encoding=3, text=id_to_key_dict[song_id]))
+            song_data.save()
     
     return
 
@@ -64,22 +86,46 @@ def write_keys_in_mp3(songs: list[Path], id_to_key_dict: dict[str, str]) -> None
         song_data.save()
     
     return
+# endregion
 
+
+# region |---| scan folder
 
 def scan_FLAC_folder_for_key_queries(folder: Path) -> dict[str, str] :
     
     queries = {}
     for track in folder.glob("*.flac") :
         track_data = FLAC(track)
+    
+        track_id = str(track_data.get("COMMENT", [""])[0])
+        title = str(track_data.get("TITLE", [""])[0])
+        artists = " ".join(track_data.get("ARTIST", []))
 
-        track_id = str(track_data["COMMENT"][0])
-        title = str(track_data["TITLE"][0])
-        artists = " ".join(track_data["ARTIST"])
-
-        queries[track_id] = f"{title} {artists}".replace("'", " ") # Remove bad char
+        query = sanitize_string_for_html_search(f"{title} {artists}")
+        if (track_id != "") and (query != "") :
+            queries[track_id] = query 
     
     return queries
+# endregion
+
+
+# region |---| sanitize
+def convert_keys(keys: dict[str, str|None]) -> dict[str, str] :
+
+    for id, key in keys.copy().items() :
         
+        if key is None :
+            keys.pop(id)
+        else :
+            keys[id] = key.replace('♭', 'b').replace("Major", "").replace("Minor", "m").replace(" ", "")
+    
+    return keys
+# endregion 
+
+# endregion
+  
+
+# region SCRAPING
 
 def scrape_keys_from_tunebat(
         queries: dict[str, str],
@@ -116,14 +162,16 @@ def scrape_keys_from_tunebat(
         artists = artists_title_divs[0].get_text().lower()
         title = artists_title_divs[1].get_text().lower()
 
+        soft_query_for_checks = query.lower()
+
         # Check if at least one artist matches the searched track
         artists_list = artists.split(",")
-        if all(a.strip() not in query.lower() for a in artists_list) :
+        if all(sanitize_string_for_html_search(a).strip() not in soft_query_for_checks for a in artists_list) :
             return None
         
-        # Remove potential (feat. abc) substring
-        title_with_no_feat = re.sub(r"\(*feat(\.)*\s*.*", "", title)
-        if title_with_no_feat not in query.lower() :
+        # This test is not 100% accurate but should filter most of the false results
+        minimalist_title = sanitize_string_for_html_search(re.sub(r"( \(| -).*", "", title)) # Removes evrything that comes after ' -' or ' ('
+        if minimalist_title not in soft_query_for_checks :
             return None
         
         return key
@@ -151,12 +199,11 @@ def scrape_keys_from_tunebat(
 
         return key
 
-
     if len(queries) == 0 :
         return {}
     
     res = {}
-    queries_stack = list(queries.items())
+    queries_queue = list(queries.items())
 
     # Launch Chromium browser
     with sync_playwright() as p:
@@ -164,30 +211,28 @@ def scrape_keys_from_tunebat(
         page = browser.new_page()
  
         # Go to the URL
-        t_id, previous_query = queries_stack.pop(0)
+        t_id, previous_query = queries_queue.pop(0)
         page.goto(tunebat_url + previous_query)
 
         # Wait for content to load
-        page.wait_for_timeout(10000)
+        page.wait_for_selector(f"input[value*='{previous_query}']")
 
         # First key
         html = page.content()
         res[t_id] = _search_for_key_in_html(html, previous_query)
+        sleep(SCRAPING_BETWEEN_WAIT_S)   
 
-        while queries_stack :
-            t_id, query = queries_stack.pop(0)
-
-            # waitime = rd.random()*2.5 + 1.5 # between 1.5s and 4s TODO play around with the timing to not get blocked after ~10 searches
-            waitime = 1.5
+        while queries_queue :
+            t_id, query = queries_queue.pop(0)
 
             key = _scrape_key_by_query(query,
                                        previous_query, 
                                        page,
-                                       waitime)
+                                       SCRAPING_BETWEEN_WAIT_S)
 
             # Not found tracks are retried later, maximum 1 retry
             if (key is None) and (t_id not in res) :
-                queries_stack.append((t_id, query))
+                queries_queue.append((t_id, query))
             
             res[t_id] = key
             previous_query = query
@@ -196,14 +241,49 @@ def scrape_keys_from_tunebat(
     
     return res
 
+# endregion
 
-def convert_keys(keys: dict[str, str|None]) -> dict[str, str] :
 
-    for id, key in keys.copy().items() :
+# region MAIN FUNCTION
+
+def get_and_tag_keys(key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]]|None) -> None :
+    """
+    Handle the key analysis on its own, totally separated from the rest of cabot
+    """
+
+    while True :
+
+        job = key_tag_queue.get()
+        if job is None :
+            break
         
-        if key is None :
-            keys.pop(id)
+        aiff_files, mp3_files, queries = job
+
+        # If something goes wrong with the keys fetching, we delete the batch and keep going
+        # This way, a future run of cabot will fix the issue
+        try :
+            keys = scrape_keys_from_tunebat(queries)
+
+        except Exception as e :
+            
+            # Delete the tracks that could not be tagged because of the bug
+            for p in aiff_files + mp3_files :
+                os.remove(p)
+            
+            print(f"\n### An error occured processing keys for this batch. Files where deleted. ###\n")
+            traceback.print_exc()
+            print("\n### Keep going with next batch. Re launch 'cabot' afterward to retry the batch.###\n")
+        
         else :
-            keys[id] = key.replace('♭', 'b').replace("Major", "").replace("Minor", "m").strip()
+
+            keys = convert_keys(keys)
+
+            write_keys_in_aiff(aiff_files, keys)
+            write_keys_in_mp3(mp3_files, keys)
+
+        # The scraping time is calibrated for a full spotify batch
+        sleep(SCRAPING_AFTER_WAIT_S * len(queries) / SPOTIFY_BATCH_SIZE)
     
-    return keys
+    return
+
+# endregion

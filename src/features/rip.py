@@ -26,6 +26,9 @@ from mutagen.mp3 import MP3
 
 MIN_FALLBACK_TRACK_DURATION = 60000 # 1 min
 MAX_FALLBACK_TRACK_DURATION = 1200000 # 20 min
+SPOTIFY_BATCH_SIZE = 15
+SOUNDCLOUD_BATCH_SIZE = 10
+
 
 # TODO REFACTOR move elsewhere
 # region ID TAGGER
@@ -40,15 +43,20 @@ def tag_track_id_by_track_isrc(
     assert downloads_folder.is_dir(), f"{downloads_folder} n'existe pas."
 
     for track in downloads_folder.glob("*.flac") :
-        track_data = FLAC(track)
+        try :
+            track_data = FLAC(track)
+        except :
+            os.remove(track)
+            print("There was an error downloading a track. You may try again later.")
+        else :
 
-        if "ISRC" in track_data :
-        
-            track_isrc = str(track_data["ISRC"][0])
+            if "ISRC" in track_data :
+            
+                track_isrc = str(track_data["ISRC"][0])
 
-            if track_isrc in isrc_to_id_dict :
-                track_data["COMMENT"] = isrc_to_id_dict[track_isrc]
-                track_data.save()
+                if track_isrc in isrc_to_id_dict :
+                    track_data["COMMENT"] = isrc_to_id_dict[track_isrc]
+                    track_data.save()
     
     return
 
@@ -89,6 +97,7 @@ def extract_track_id(song: Path) -> str | None :
 
 # region SPOTIFY
 
+# region |---| Fetch
 _CACHE_SPOTIFY_PLAYLIST = {}
 def fetch_spotify_playlist(url: str) -> dict :
 
@@ -111,21 +120,22 @@ def fetch_spotify_playlist(url: str) -> dict :
 
 
     return spotify_playlist
+# endregion
 
-
+# region |---| Rip
 async def rip_spotify_playlist(
         spotify_playlist: dict,
         memory: set[str],
         offset: int,
-        limit: int=15) -> tuple[dict[str, str],
-                                dict[str, str],
-                                set[str],
-                                int,
-                                bool] :
+        limit: int=SPOTIFY_BATCH_SIZE) -> tuple[dict[str, str],
+                                                dict[tuple[str, str], str],
+                                                set[str],
+                                                int,
+                                                bool] :
     """
     Returns :
         - Found (on Qobuz) ISRC -> Searched ISRC (Spotify) corresponding dict (dict[str, str])
-        - Failed tracks, storing ISRC as well as title - artists (dict[str, str])
+        - Failed tracks, storing ISRC as well as title - artists (dict[tuple[str, str], str])
         - Memory match (set[str])
         - Next track index to process (int)
         - Is the playlist fully ripped (bool)
@@ -158,12 +168,15 @@ async def rip_spotify_playlist(
             track_idx: int,
             client: Client,
             search_status: Status,
-            callback) -> tuple[int, str | None, str, str]:
+            callback) -> tuple[int, 
+                               str | None, 
+                               str | tuple[str, str], 
+                               str]:
         """
         Returns :
             - Track index in the playlist (int)
             - Qobuz's track id (str), None if not found
-            - Found ISRC (Qobuz), query for fallback if not found (str) 
+            - Found ISRC on Qobuz (str), query for fallback if not found (tuple[str, str])
             - Searched ISRC (Spotify) (str)
         """
 
@@ -307,7 +320,7 @@ async def rip_spotify_playlist(
 
             # Fail
             search_status.failed += 1
-            fallback_query = f"{name} - {', '.join(artists)}"
+            fallback_query = (name, ", ".join(artists))
 
             return track_idx, None, fallback_query, isrc
 
@@ -370,7 +383,7 @@ async def rip_spotify_playlist(
                     s.found += 1
 
             else :
-                fallback_query = f"{title} - {', '.join(artists)}"
+                fallback_query = (title, ", ".join(artists))
                 failed_tracks[fallback_query] = None
                 s.failed += 1
             
@@ -402,7 +415,7 @@ async def rip_spotify_playlist(
                     ))
             memory_id_by_isrc[found_isrc] = searched_isrc
         else :
-            fallback_query = found
+            fallback_query = found # title, artists
             failed_tracks[fallback_query] = searched_isrc
 
     qobuz_playlist = Playlist(playlist_title, config, client, pending_tracks)
@@ -417,6 +430,7 @@ async def rip_spotify_playlist(
 
 
     return memory_id_by_isrc, failed_tracks, memory_match, next_track, (next_track == playlist_length)
+# endregion
 
 # endregion
 
@@ -452,15 +466,17 @@ async def fetch_soundcloud_playlist(url: str) -> dict :
 
 # region |---| Search and build
 async def build_soundcloud_playlist(
-        fallback_queries: dict[str, str],
+        fallback_queries: dict[tuple[str, str], str],
         playlist_title: str) -> tuple[dict,
-                                      list[str]] :
+                                      list[tuple[str, str]]] :
     
     async def _make_query(
-            query: str,
-            spotify_isrc: str) -> tuple[dict, str] :
+            title: str,
+            artists: str,
+            spotify_isrc: str) -> tuple[list[dict], tuple[str, str], str] :
+        query = f"{title} - {artists}"
         res = await client.search("track", query, limit=1)
-        return res, query, spotify_isrc
+        return res, (title, artists), spotify_isrc
 
 
     # Search tracks
@@ -470,8 +486,8 @@ async def build_soundcloud_playlist(
     await client.login()
 
     requests = []
-    for query, spotify_isrc in fallback_queries.items() :
-        requests.append(_make_query(query, spotify_isrc))
+    for (title, artists), spotify_isrc in fallback_queries.items() :
+        requests.append(_make_query(title, artists, spotify_isrc))
     
     res = await asyncio.gather(*requests)
 
@@ -483,17 +499,23 @@ async def build_soundcloud_playlist(
         "tracks": [],    
     }
     double_failed = []
-    for track, query, spotify_isrc in res :
+    for track, (title, artists), spotify_isrc in res :
         
         found = track[0]["collection"]
         
         # Avoid demo and full sets
         if len(found) > 0 and (MIN_FALLBACK_TRACK_DURATION < found[0]["duration"] < MAX_FALLBACK_TRACK_DURATION) :
             track = found[0]
+            
             track["isrc"] = spotify_isrc    # This allows to keep track of the originally searched isrc
+            track["title"] = title  # This allows to tag the title/artists afterward
+            track["artists"] = artists
+            track["force_metadata_tag"] = True
+            
             playlist["tracks"].append(track)
+        
         else :
-            double_failed.append(query)
+            double_failed.append((title, artists))
     
     return playlist, double_failed
 
@@ -504,13 +526,13 @@ async def rip_soundcloud_playlist(
         soundcloud_playlist: dict,
         memory: set[str],
         offset: int,
-        limit: int=10) -> tuple[list[str],
-                                set[str],
-                                int,
-                                bool] :
+        limit: int=SOUNDCLOUD_BATCH_SIZE) -> tuple[list[tuple[str, str]],
+                                                   set[str],
+                                                   int,
+                                                   bool] :
     """
     Returns :
-        - Double failed track (list[str])
+        - Double failed track (list[tuple[str, str]])
         - Memory match (set[str])
         - Next track index to process (int)
         - Is the playlist fully ripped (bool)
@@ -537,6 +559,7 @@ async def rip_soundcloud_playlist(
 
     # Extract URLs and RIP
     memory_id_by_track_name = {}
+    title_artists_by_track_name = {}
     failed_tracks = []
     tracks_path = []
     next_track = offset
@@ -545,18 +568,23 @@ async def rip_soundcloud_playlist(
 
         track = soundcloud_playlist["tracks"][next_track]
         
+        title = track.get("title", "UNKNOWN TITLE")
+        artists = track.get("artists", "UNKNOWN ARTISTS")
+        
         track_id = str(track["id"]).split("|")[0] # Trash ID management from Streamrip
         if "isrc" in track :
             track_id = track["isrc"] # Manually added original Spotify ISRC for memory management (fallback)
-        
+
         if not track_id in memory :
             
             try :
                 path = await download(track["permalink_url"], audioFormat="wav", filenameStyle="nerdy", folder_path=str(downloaded_playlist_folder))
             except :
-                failed_tracks.append(track["title"])
+                failed_tracks.append((title, artists))
             else :
                 memory_id_by_track_name[path.stem] = track_id
+                if track.get("force_metadata_tag", False) :
+                    title_artists_by_track_name[path.stem] = (title, artists)
                 
                 tracks_path.append(path)
                 requested_tracks += 1
@@ -579,9 +607,21 @@ async def rip_soundcloud_playlist(
             flac_track = convert_to_flac(track)
             os.remove(track)
 
-            song_data = FLAC(flac_track)
-            song_data["COMMENT"] = str(memory_id_by_track_name[track.stem])
-            song_data.save()
+            try :
+                song_data = FLAC(flac_track)
+            except :
+                os.remove(flac_track)
+                print("There was an error downloading a track, you may try again later.")
+            else :
+                song_data["COMMENT"] = str(memory_id_by_track_name[track.stem])
+                
+                # Write proper metadata
+                if track.stem in title_artists_by_track_name :
+                    spotify_title, spotify_artists = title_artists_by_track_name[track.stem]
+                    song_data["TITLE"] = spotify_title
+                    song_data["ARTIST"] = spotify_artists.split(", ")
+                
+                song_data.save()
 
     return failed_tracks, memory_match, next_track, (next_track == playlist_length)
 
