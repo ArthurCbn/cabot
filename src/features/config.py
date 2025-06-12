@@ -100,8 +100,8 @@ def initialize_config() -> None :
 def set_default_config() -> None :
     shutil.copy(DEFAULT_CABOT_CONFIG_PATH, CONFIG_PATH)
     set_cabot_config_value(["tmp_folder"], str(CABOT / "tmp_download"))
-    set_cabot_config_value(["mp3_copy"], "True")
-    set_cabot_config_value(["disable_key_analysis"], "False")
+    set_cabot_config_value(["mp3_copy"], True)
+    set_cabot_config_value(["disable_key_analysis"], False)
     initialize_config()
 
 # endregion

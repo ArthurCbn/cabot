@@ -60,8 +60,8 @@ Set-up your playlists' urls directly in `config.json` like so :
 ```json
 {
     "playlists_folder": "your/playlists/folder",
-    "mp3_copy": "True",
-    "disable_key_analysis": "False",
+    "mp3_copy": true,
+    "disable_key_analysis": false,
     "playlists": {
         "your_1st_playlist": {
             "spotify": "url_to_1st_spotify_playlist",
