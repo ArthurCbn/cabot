@@ -5,6 +5,7 @@ from .features.update import update_playlists
 from .features.config import (
     initialize_config,
     get_cabot_config_value,
+    set_cabot_config_value
 )
 from .features.key import get_and_tag_keys
 from queue import Queue
@@ -13,8 +14,6 @@ import threading
 if __name__ == '__main__' :
 
     initialize_config()
-
-    disable_key_analysis = bool(get_cabot_config_value(["disable_key_analysis"]))
 
     # Clear the tmp files
     tmp_folder = Path(get_cabot_config_value(["tmp_folder"]))
@@ -28,6 +27,8 @@ if __name__ == '__main__' :
     else :
         playlists = None # All playlists
     
+    
+    disable_key_analysis = bool(get_cabot_config_value(["disable_key_analysis"]))
     if disable_key_analysis :
         update_playlists(playlists_to_update=playlists)
 

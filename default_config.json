@@ -10,8 +10,8 @@
     },
     "tmp_folder": "",
     "playlists_folder": "your/playlists/folder",
-    "mp3_copy": "True",
-    "disable_key_analysis": "False",
+    "mp3_copy": true,
+    "disable_key_analysis": false,
     "playlists": {
         "your_playlist": {
             "spotify": "playlist_spotify_url"
