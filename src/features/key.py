@@ -131,6 +131,16 @@ def scrape_keys_from_tunebat(
         queries: dict[str, str],
         tunebat_url: str=TUNEBAT_URL) -> dict[str, str|None] :
 
+    def __click_cookie_button(page: Page) : 
+        
+        # We assume the "accept cookie" button is the last one in the page
+        all_buttons = page.query_selector_all("button")
+        for b in reversed(all_buttons):
+            if b.is_visible() and b.is_enabled():
+                b.click()
+                return
+
+
     def _search_for_key_in_html(html: str, query: str) -> str|None :
         """
         The interesting html portion looks like this :
@@ -183,6 +193,8 @@ def scrape_keys_from_tunebat(
             page: Page,
             wait_s: float) -> str|None:
         
+        previous_url = page.url
+
         # Fill the search field
         input_element = page.locator(f"input[value*='{previous_query}']")
         input_element.fill(query)
@@ -190,7 +202,14 @@ def scrape_keys_from_tunebat(
         # Click search button
         filled_input = page.locator(f"input[value*='{query}']")
         button = filled_input.locator(f"xpath=../../button")
-        button.click()
+
+        button.click(force=True)
+
+        # Click didn't work => cookie pop-up
+        new_url = page.url
+        if new_url == previous_url :
+            __click_cookie_button(page)
+            button.click(force=True)
 
         sleep(wait_s)
 
