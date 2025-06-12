@@ -61,6 +61,7 @@ Set-up your playlists' urls directly in `config.json` like so :
 {
     "playlists_folder": "your/playlists/folder",
     "mp3_copy": "True",
+    "disable_key_analysis": "False",
     "playlists": {
         "your_1st_playlist": {
             "spotify": "url_to_1st_spotify_playlist",
@@ -77,7 +78,7 @@ Set-up your playlists' urls directly in `config.json` like so :
 ```
 
 `mp3_copy` is useful if you want to have a copy of every downloaded tracks in mp3 320kbps.
-
+`disable_key_analysis` allows you to get rid of this feature if it bothers you.
 
 ### Qobuz credentials
 

@@ -92,7 +92,7 @@ def _update_one_playlist(
         download_path: Path,
         playlists_folder: Path,
         duplicate_to_mp3: bool,
-        key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None]) -> None :
+        key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None]|None=None) -> None :
     """
     This function should never be called on its own as the multi-threading is handled by its mother function : "update_playlists"
     """
@@ -105,7 +105,7 @@ def _update_one_playlist(
             tag_keys: bool,
             download_path: Path=download_path,
             duplicate_to_mp3: bool=duplicate_to_mp3,
-            key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None]=key_tag_queue) -> None :
+            key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None]|None=key_tag_queue) -> None :
 
         # Check new downloads
         if not download_path.exists() :
@@ -128,7 +128,7 @@ def _update_one_playlist(
         print("Converting...Done.")
 
         # Send the job to the queue, handled in another thread
-        if tag_keys :
+        if tag_keys and (not key_tag_queue is None) :
             queries = scan_FLAC_folder_for_key_queries(downloaded_playlist)
             key_tag_queue.put((aiff_files, mp3_files, queries))
 
@@ -315,7 +315,7 @@ def _update_one_playlist(
 # region RUN
 
 def update_playlists(
-        key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None],
+        key_tag_queue: Queue[tuple[list[Path], list[Path], dict[str, str]]|None]|None=None,
         playlists_to_update: list[str]|None=None) -> None :
 
     duplicate_to_mp3 = bool(get_cabot_config_value(["mp3_copy"]))
@@ -346,7 +346,8 @@ def update_playlists(
                             key_tag_queue=key_tag_queue)
     
     # Signal the key tagger that ripping is done
-    key_tag_queue.put(None)
+    if not key_tag_queue is None :
+        key_tag_queue.put(None)
 
     return
 

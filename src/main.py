@@ -14,6 +14,8 @@ if __name__ == '__main__' :
 
     initialize_config()
 
+    disable_key_analysis = bool(get_cabot_config_value(["disable_key_analysis"]))
+
     # Clear the tmp files
     tmp_folder = Path(get_cabot_config_value(["tmp_folder"]))
     if tmp_folder.exists() :
@@ -26,21 +28,26 @@ if __name__ == '__main__' :
     else :
         playlists = None # All playlists
     
-    # Dual thread : key tagging is done parallel to ripping due to the time it takes to scrape data
-    # This works as a producer-consumer duo :
-    # - The ripping thread produce the queries needed to scrape the keys and the locations of the corresponding files
-    # - The key tagging thread process every job sent by the other thread
+    if disable_key_analysis :
+        update_playlists(playlists_to_update=playlists)
 
-    # This is a thread-safe queue (allow for communication between the two threads)
-    key_tag_queue = Queue()
+    else :
 
-    ripping_thread = threading.Thread(target=lambda: update_playlists(key_tag_queue=key_tag_queue,
-                                                                      playlists_to_update=playlists))
-    key_tagging_thread = threading.Thread(target=lambda: get_and_tag_keys(key_tag_queue=key_tag_queue))
+        # Dual thread : key tagging is done parallel to ripping due to the time it takes to scrape data
+        # This works as a producer-consumer duo :
+        # - The ripping thread produce the queries needed to scrape the keys and the locations of the corresponding files
+        # - The key tagging thread process every job sent by the other thread
 
-    ripping_thread.start()
-    key_tagging_thread.start()
+        # This is a thread-safe queue (allow for communication between the two threads)
+        key_tag_queue = Queue()
 
-    ripping_thread.join()
-    key_tagging_thread.join()
+        ripping_thread = threading.Thread(target=lambda: update_playlists(key_tag_queue=key_tag_queue,
+                                                                        playlists_to_update=playlists))
+        key_tagging_thread = threading.Thread(target=lambda: get_and_tag_keys(key_tag_queue=key_tag_queue))
+
+        ripping_thread.start()
+        key_tagging_thread.start()
+
+        ripping_thread.join()
+        key_tagging_thread.join()
     
