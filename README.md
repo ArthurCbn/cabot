@@ -5,13 +5,18 @@ This keeps your downloaded tracks up-tp-date with your Spotify and Soundcloud pl
 - If you add a track to your Spotify or Soundcloud playlist, it will be downloaded and added to the right folder,
 - If you remove a track, it will also be removed from your downloaded tracks.
 
-> **DISCLAIMER** : Downloading your whole library can take quite some time (downloads from Soundcloud take ages for some reason...) : for instance my library of 1500 tracks can take up to 3-4h to be fully downloaded.
+> **DISCLAIMER** : Downloading your whole library can take quite some time : for instance my library of 1500 tracks can take up to 3-4h to get fully downloaded.
 
 Cabot first tries to download **from Qobuz in lossless quality**, if the track doesn't exist there, it will search for it on Soundcloud.
+It then opens a navigator window to scrape the **harmonic key** from TuneBat and then tags it into the file (don't freak out when it does that, if you want to use your computer while running cabot, you might wan't to set your window "Always on Top" to not be bothered).
+
+>[!Tip]
+>If you're using a software such as Rekordbox, go in the "Track Analysis" settings and disable the key analysis to take advantage of the tagging from TuneBat (which is WAY more reliable). 
+
 
 Tracks that are downloaded from Soundcloud instead of Qobuz are kept apart in the "fallback" subfolders of your playlists. After updating your playlists, **double-check the "fallback" folders** : 
 - If a track corresponds to what you wanted, **move it out of the fallback folder into the corresponding folder** ("AIFF" or "MP3") : this way it will be _locked_ and cabot won't try to donwload it again from Qobuz or Soundcloud (and risk overwriting it),
-- Else, you can keep it here, but keep in mind that cabot will try to download it again and might overwrite it if it finds another _better_ version from Qobuz or Soundcloud.
+- Else, you can keep it here, but keep in mind that cabot will try to download it again and might overwrite it if it finds another _better_ version from Qobuz.
   
 > The download quality from Soundcloud isn't true lossless (I think), but still better than mp3.
 
@@ -122,6 +127,3 @@ There you will find your Client ID and Client Secret, you can then copy-paste th
 Just type `cabot` in your terminal to update all configurated playlists.
 You can also specify certain playlists as arguments : `cabot playlist1 "another playlist with multiple words"`.
 
-## Future features
-
-- Analyse key and automatically add it to the metadata
