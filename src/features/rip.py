@@ -578,8 +578,19 @@ async def rip_soundcloud_playlist(
         if not track_id in memory :
             
             try :
-                path = await download(track["permalink_url"], audioFormat="wav", filenameStyle="nerdy", folder_path=str(downloaded_playlist_folder))
-            except :
+                bad_path= await download(
+                    track["permalink_url"], 
+                    audioFormat="wav", 
+                    filenameStyle="nerdy", 
+                    #folder_path=str(downloaded_playlist_folder),
+                    remux=True,
+                )
+
+                # Until pybalt 2025.5.9 is fixed (Issue #13)
+                path = downloaded_playlist_folder / bad_path.name
+                os.rename(bad_path, path)
+
+            except Exception as e :
                 failed_tracks.append((title, artists))
             else :
                 memory_id_by_track_name[path.stem] = track_id

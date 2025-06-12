@@ -6,6 +6,8 @@ tinytag
 toml
 mutagen
 spotipy
-pybalt
+pybalt==2025.5.9
 beautifulsoup4
 playwright
+dotenv
+pyyaml
