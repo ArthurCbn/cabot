@@ -286,10 +286,12 @@ def _update_one_playlist(
 
     # region |---| Double failed tracks
     if double_failed :
-        print("The following tracks could not be downloaded, neither from Qobuz nor from Soundcloud :")
+        fail_string = "The following tracks could not be downloaded, neither from Qobuz nor from Soundcloud :\n"
         for title, artists in double_failed :
-            print(f"   -> {title} - {artists}")
-        print("")
+            fail_string += f"   -> {title} - {artists}\n"
+        
+        with open(playlist_path / "tracks_not_found.txt", "w") as f :
+            f.write(fail_string)
 
     # endregion
 
