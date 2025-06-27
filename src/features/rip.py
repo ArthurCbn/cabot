@@ -487,7 +487,11 @@ async def build_soundcloud_playlist(
 
     requests = []
     for (title, artists), spotify_isrc in fallback_queries.items() :
-        requests.append(_make_query(title, artists, spotify_isrc))
+
+        # If the spotify fetching goes very wrong (track do not exist anymore I suppose, this can yield a fully empty query...)
+        if title != "" and artists != "" :
+            
+            requests.append(_make_query(title, artists, spotify_isrc))
     
     res = await asyncio.gather(*requests)
 
@@ -499,10 +503,10 @@ async def build_soundcloud_playlist(
         "tracks": [],    
     }
     double_failed = []
-    for track, (title, artists), spotify_isrc in res :
-        
-        found = track[0]["collection"]
-        
+    for tracks, (title, artists), spotify_isrc in res :
+
+        found = tracks[0]["collection"]
+
         # Avoid demo and full sets
         if len(found) > 0 and (MIN_FALLBACK_TRACK_DURATION < found[0]["duration"] < MAX_FALLBACK_TRACK_DURATION) :
             track = found[0]
@@ -513,7 +517,7 @@ async def build_soundcloud_playlist(
             track["force_metadata_tag"] = True
             
             playlist["tracks"].append(track)
-        
+
         else :
             double_failed.append((title, artists))
     
