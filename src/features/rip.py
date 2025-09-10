@@ -115,6 +115,19 @@ def fetch_spotify_playlist(url: str) -> dict :
     # Fetch
     spotify_playlist = sp.playlist(url)
 
+    # Collect tracks (handling pagination)
+    tracks = []
+    results = sp.playlist_items(url, limit=100, offset=0)
+    tracks.extend(results["items"])
+
+    while results["next"]:
+        results = sp.next(results)
+        tracks.extend(results["items"])
+
+    # Replace partial tracks with full track list
+    spotify_playlist["tracks"]["items"] = tracks
+    spotify_playlist["tracks"]["total"] = len(tracks)
+
     # Memoize
     _CACHE_SPOTIFY_PLAYLIST[url] = spotify_playlist
 
