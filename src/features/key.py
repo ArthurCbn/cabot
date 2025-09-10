@@ -49,6 +49,15 @@ UNSAFE_CHAR = ["'", "&", "{", "}", "#"]
 SCRAPING_BETWEEN_WAIT_S = 3
 SCRAPING_AFTER_WAIT_S = 30
 
+KEY_REPLACE = {
+    "Major": "",
+    "major": "",
+    "Minor": "m",
+    "minor": "m",
+    "♭": "b",
+    "♯": "#"
+}
+
 # region UTILS
 
 # region |---| sanitizer
@@ -117,7 +126,9 @@ def convert_keys(keys: dict[str, str|None]) -> dict[str, str] :
         if key is None :
             keys.pop(id)
         else :
-            keys[id] = key.replace('♭', 'b').replace("Major", "").replace("Minor", "m").replace(" ", "")
+            for a, b in KEY_REPLACE.items() :
+                key = key.replace(a, b)
+            keys[id] = key
     
     return keys
 # endregion 
