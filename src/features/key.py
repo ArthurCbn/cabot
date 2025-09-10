@@ -55,7 +55,8 @@ KEY_REPLACE = {
     "Minor": "m",
     "minor": "m",
     "♭": "b",
-    "♯": "#"
+    "♯": "#",
+    " ": "",
 }
 
 # region UTILS
