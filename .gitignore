@@ -3,9 +3,9 @@
 
 .vscode
 
-sandbox
+*.json
+!default_config.json
 
 .cache
 *.db
-config.json
 tmp_download
