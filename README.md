@@ -39,19 +39,13 @@ ffmpeg
 ```
 git clone git@github.com:ArthurCbn/cabot.git
 cd cabot
-bash installation.sh
-source ~/.bashrc
+bash setup.sh
 ```
 
 ### Windows - using Gitbash
 1. Install [git bash](https://git-scm.com/downloads/win)
 2. See above for installation using bash
 
-## Update
-When inside cabot directory :
-```
-bash update.sh
-```
 
 ## Setup
 

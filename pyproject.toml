@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cabot"
+version = "1.0.0"
+description = "Outil CLI pour gérer le téléchargement des fichiers lossless"
+authors = [
+    { name = "Arthur Cabon" }
+]
+requires-python = ">=3.8"
+
+dependencies = [
+    "streamrip @ git+https://github.com/ArthurCbn/streamrip_for_cabot.git@fv2.1.1", # patched version of streamrip
+    "python-ffmpeg",
+    "numpy",
+    "pydub",
+    "tinytag",
+    "toml",
+    "mutagen",
+    "spotipy",
+    "pybalt==2025.5.9",
+    "beautifulsoup4",
+    "playwright",
+    "dotenv",
+    "pyyaml"
+]
+
+[project.scripts]
+cabot = "cabot.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

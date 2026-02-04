@@ -12,11 +12,14 @@ from streamrip.client.qobuz import QobuzClient
 from streamrip.client.soundcloud import SoundcloudClient
 from streamrip.config import Config
 from streamrip.db import Downloads, Database, Dummy
-from streamrip.config import DEFAULT_DOWNLOADS_DB_PATH
-from .config import (
-    get_cabot_config_value,
+from streamrip.config import (
+    DEFAULT_DOWNLOADS_DB_PATH,
 )
-from .convert import convert_to_flac
+from cabot.config import (
+    get_cabot_config_value,
+    TMP_DOWNLOAD_PATH,
+)
+from cabot.convert import convert_to_flac
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyClientCredentials
 from pybalt import download
@@ -339,7 +342,6 @@ async def rip_spotify_playlist(
 
 
     # Fetch config values
-    download_folder = Path(get_cabot_config_value(["tmp_folder"]))
     qobuz_email = get_cabot_config_value(["qobuz", "email"])
     qobuz_token = get_cabot_config_value(["qobuz", "token"])
     quality = get_cabot_config_value(["qobuz", "quality"])
@@ -421,7 +423,7 @@ async def rip_spotify_playlist(
                         qobuz_id,
                         client,
                         config,
-                        download_folder / playlist_title.replace("/", " "),
+                        TMP_DOWNLOAD_PATH / playlist_title.replace("/", " "),
                         playlist_title,
                         pos+1,
                         db,
@@ -555,19 +557,14 @@ async def rip_soundcloud_playlist(
         - Is the playlist fully ripped (bool)
     """
 
-    # Fetch config value
-    download_folder = Path(get_cabot_config_value(["tmp_folder"]))
-
     playlist_title = soundcloud_playlist["title"]
     playlist_length = len(soundcloud_playlist["tracks"])
 
     # Downloads foalder
-    downloaded_playlist_folder = download_folder / playlist_title
+    downloaded_playlist_folder = TMP_DOWNLOAD_PATH / playlist_title
 
-    if not download_folder.exists() :
-        os.mkdir(download_folder)
-    if not downloaded_playlist_folder.exists() : 
-        os.mkdir(downloaded_playlist_folder)
+    os.makedirs(TMP_DOWNLOAD_PATH, exist_ok=True)
+    os.makedirs(downloaded_playlist_folder, exist_ok=True)
 
     memory_match = set()
 
