@@ -11,10 +11,12 @@ from bs4 import BeautifulSoup
 import traceback
 from playwright.sync_api import sync_playwright, Page
 from time import sleep
-from .rip import (
+from cabot.rip import (
     extract_track_id,
     SPOTIFY_BATCH_SIZE,
 )
+import os
+import subprocess
 
 TUNEBAT_URL = "https://tunebat.com/Search?q="
 
@@ -237,6 +239,13 @@ def scrape_keys_from_tunebat(
     queries_queue = list(queries.items())
 
     # Launch Chromium browser
+    subprocess.Popen(
+        ["Xvfb", ":99", "-screen", "0", "1280x720x24"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    os.environ["DISPLAY"] = ":99"    
+    
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()

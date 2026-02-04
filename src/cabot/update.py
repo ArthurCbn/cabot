@@ -3,18 +3,20 @@ import asyncio
 from pathlib import Path
 from queue import Queue
 import shutil
-from .config import (
+from cabot.config import (
     get_cabot_config_value,
+    TMP_DOWNLOAD_PATH,
+    PLAYLISTS_PATH,
 )
 from streamrip.config import DEFAULT_DOWNLOADS_DB_PATH
 from streamrip.progress import (
     _p,
 )
-from .convert import (
+from cabot.convert import (
     convert_batch_to_aiff,
     convert_batch_to_mp3,
 )
-from .rip import (
+from cabot.rip import (
     rip_spotify_playlist,
     rip_soundcloud_playlist,
     fetch_spotify_playlist,
@@ -23,7 +25,7 @@ from .rip import (
     extract_track_id,
     build_soundcloud_playlist,
 )
-from .key import (
+from cabot.key import (
     scan_FLAC_folder_for_key_queries,
 )
 
@@ -321,8 +323,7 @@ def update_playlists(
         playlists_to_update: list[str]|None=None) -> None :
 
     duplicate_to_mp3 = bool(get_cabot_config_value(["mp3_copy"]))
-    download_path = Path(get_cabot_config_value(["tmp_folder"]))
-    playlists_folder = Path(get_cabot_config_value(["playlists_folder"]))
+    playlists_folder = PLAYLISTS_PATH
 
     playlists = get_cabot_config_value(["playlists"])
 
@@ -342,7 +343,7 @@ def update_playlists(
 
         _update_one_playlist(playlist=playlist,
                             sources=sources,
-                            download_path=download_path,
+                            download_path=TMP_DOWNLOAD_PATH,
                             playlists_folder=playlists_folder,
                             duplicate_to_mp3=duplicate_to_mp3,
                             key_tag_queue=key_tag_queue)
