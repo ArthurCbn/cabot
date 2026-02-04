@@ -4,28 +4,26 @@ import json
 import toml
 from streamrip.config import DEFAULT_CONFIG_PATH
 from typing import Any
+from importlib import resources
 
 # region Utils
-def get_project_root() -> Path :
 
-    current_directory = Path(__file__).resolve().parent
+APP_NAME = "cabot"
+APP_AUTHOR = "ArthurCabon"
 
-    while current_directory != current_directory.root :
-        if (current_directory / "README.md").exists() :
-            return current_directory
-        current_directory = current_directory.parent
-    
-    return FileNotFoundError("Project root not found")
+CONFIG_DIR_PATH = Path("/app/.config")
+CONFIG_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
-
-CABOT = get_project_root()
-DEFAULT_CABOT_CONFIG_PATH = CABOT / "default_config.json"
-CONFIG_PATH = CABOT / "config.json"
+CONFIG_PATH = CONFIG_DIR_PATH / "config.json"
 CONFIG_CORRESPONDANCE = {
     ("qobuz", "email"): ("qobuz", "email_or_userid"),
-    ("qobuz", "token"): ("qobuz", "password_or_token"),
-    ("tmp_folder",): ("downloads", "folder")
+    ("qobuz", "token"): ("qobuz", "password_or_token")
 }
+
+TMP_DOWNLOAD_PATH = Path("/app/cache/tmp_download")
+CONFIG_DIR_PATH.mkdir(parents=True, exist_ok=True)
+
+PLAYLISTS_PATH = Path("/app/data")
 
 # endregion
 
@@ -93,15 +91,18 @@ def apply_cabot_config_to_streamrip() -> None :
 
 
 # region default
+
 def initialize_config() -> None :
     apply_cabot_config_to_streamrip()
     set_streamrip_config_value("qobuz", "use_auth_token", "true")
+    set_streamrip_config_value("downloads", "folder", str(TMP_DOWNLOAD_PATH))
 
 def set_default_config() -> None :
-    shutil.copy(DEFAULT_CABOT_CONFIG_PATH, CONFIG_PATH)
-    set_cabot_config_value(["tmp_folder"], str(CABOT / "tmp_download"))
+
+    with resources.as_file(resources.files("cabot.data") / "default_config.json") as default_config_path:
+        shutil.copy(default_config_path, CONFIG_PATH)
+
     set_cabot_config_value(["mp3_copy"], True)
     set_cabot_config_value(["disable_key_analysis"], False)
-    initialize_config()
 
 # endregion

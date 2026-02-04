@@ -27,11 +27,8 @@ Tracks that are downloaded from Soundcloud instead of Qobuz are kept apart in th
 ## Dependencies
 
 ```
-Python
-ffmpeg
+docker
 ```
-
-> Get ffmpeg [here](https://www.ffmpeg.org/download.html).
 
 ## Installation
 
@@ -39,23 +36,23 @@ ffmpeg
 ```
 git clone git@github.com:ArthurCbn/cabot.git
 cd cabot
-bash installation.sh
-source ~/.bashrc
+bash setup.sh
 ```
 
 ### Windows - using Gitbash
 1. Install [git bash](https://git-scm.com/downloads/win)
 2. See above for installation using bash
 
-## Update
-When inside cabot directory :
+
+## Config
+
 ```
-bash update.sh
+cabot config
 ```
 
-## Setup
+### Playlists
 
-Set-up your playlists' urls directly in `config.json` like so :
+Set-up your playlists' urls directly in the config file like so :
 
 ```json
 {
@@ -82,7 +79,7 @@ Set-up your playlists' urls directly in `config.json` like so :
 
 ### Qobuz credentials
 
-Set-up your qobuz credentials directly in `config.json` like so :
+Set-up your qobuz credentials directly in the config file like so :
 
 ```json
 {
@@ -112,7 +109,7 @@ To do so, go [here](https://developer.spotify.com/) and follow these steps :
 6. Click "Save"
 7. Go to "Settings" on the new 'app' you just created
 
-There you will find your Client ID and Client Secret, you can then copy-paste them into `config.json` :
+There you will find your Client ID and Client Secret, you can then copy-paste them into the config file :
 
 ```json
 {
@@ -125,6 +122,6 @@ There you will find your Client ID and Client Secret, you can then copy-paste th
 
 ## Usage
 
-Just type `cabot` in your terminal to update all configurated playlists.
-You can also specify certain playlists as arguments : `cabot playlist1 "another playlist with multiple words"`.
+Just type `cabot update` in your terminal to update all configurated playlists.
+You can also specify certain playlists as arguments : `cabot update playlist1 "another playlist with multiple words"`.
 
